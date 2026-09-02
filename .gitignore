@@ -1,0 +1,23 @@
+# foundry
+out/
+cache/
+broadcast/*/dry-run/
+lib/
+
+# node
+node_modules/
+.next/
+dist/
+*.tsbuildinfo
+
+# env — JANGAN PERNAH commit
+.env
+.env.*
+!.env.example
+
+# subgraph
+subgraph/generated/
+subgraph/build/
+
+# os
+.DS_Store
