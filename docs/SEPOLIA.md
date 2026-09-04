@@ -32,6 +32,36 @@ dengan yang ter-deploy di Sepolia.
 Untuk broadcast, pakai endpoint ber-key (Alchemy/Infura) — publicnode cukup untuk
 baca, belum tentu andal untuk kirim transaksi.
 
+## ⚠️ WALLET — BUTUH PENDANAAN MANUAL
+
+Dua wallet testnet dibuat 4 Sept, tersimpan di `.env` (chmod 600, gitignored).
+**Keduanya kosong.** Faucet butuh captcha/login jadi tidak bisa diotomatiskan.
+
+| Peran | Alamat | Butuh |
+|---|---|---|
+| DEPLOYER | `0x311159a207D9C9c9AE83C4F83ED18De346bfa4BA` | ~0,5 ETH |
+| KEEPER | `0xd643ee841bf365E4d5f46Bb9072B18a4cD056C5B` | ~0,05 ETH |
+
+Deployer butuh lebih banyak: deploy 2 ERC20 + init pool + mint posisi + deploy
+Envoyage + beberapa self-trade untuk membangkitkan fee.
+
+### Faucet (kerjakan lebih awal — banyak yang punya cooldown 24 jam)
+
+| Faucet | Syarat |
+|---|---|
+| `cloud.google.com/application/web3/faucet/ethereum/sepolia` | akun Google, 0,05/hari |
+| `sepolia-faucet.pk910.de` (PoW) | tanpa akun, mining di browser, bisa banyak |
+| `faucets.chain.link/sepolia` | login GitHub |
+| `www.alchemy.com/faucets/ethereum-sepolia` | akun Alchemy |
+
+PoW faucet pk910 biasanya paling andal untuk jumlah besar tanpa syarat saldo mainnet.
+
+**Verifikasi setelah didanai:**
+```bash
+source .env
+cast balance $DEPLOYER_ADDRESS --rpc-url $SEPOLIA_RPC_URL --ether
+```
+
 ## Pool demo — belum dibuat
 
 ⚠️ **Pakai LP fee statis TINGGI (1–10%, bukan 0,3%).** Fee terlalu kecil →
