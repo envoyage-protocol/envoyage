@@ -179,10 +179,23 @@ penjual. Itu persis kelas Code4rena H-04 yang kita klaim cegah.
 **Kenapa `minInterval`:** tanpanya keeper memanggil sesering mungkin dan menguras
 nilai lewat biaya berulang.
 
-🔴 **Satu tokenId hanya boleh punya SATU mandate hidup.** `grant` pada tokenId yang
-sudah punya mandate aktif harus revert. Ini membuat pencabutan atomik secara gratis,
-membuat cap fee benar-benar sebuah cap, dan membuat halaman mandate = kebenaran
-lengkap tentang posisi itu.
+🔴 **Satu tokenId hanya boleh punya SATU mandate hidup.** Ini membuat pencabutan
+atomik secara gratis, membuat cap fee benar-benar sebuah cap, dan membuat halaman
+mandate = kebenaran lengkap tentang posisi itu.
+
+⚠️ **Aturan ini TIDAK bisa ditegakkan dari struct saja.** `Mandate` di-key oleh
+`mandateId`; revoke-lalu-grant menghasilkan `mandateId` kedua untuk `tokenId` yang
+sama, dan tidak ada apa pun untuk diperiksa. Wajib ada state terpisah:
+
+```solidity
+mapping(uint256 tokenId => uint256 activeMandateId) public activeMandate;
+// grant():  require(activeMandate[tokenId] == 0, MandateAlreadyActive());
+//           activeMandate[tokenId] = mandateId;
+// revoke(): delete activeMandate[tokenId];
+```
+
+Tanpa ini, klaim keamanan di §6b tidak punya penegak. Jangan biarkan agent
+menyimpulkan pemeriksaan yang tidak punya sasaran.
 
 ### Gerbang yang revert
 kedaluwarsa · dicabut · pemanggil bukan keeper terdaftar · `compound` tidak diizinkan ·
