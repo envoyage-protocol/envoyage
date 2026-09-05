@@ -271,6 +271,22 @@ Jangan melompat. Kalau terblokir, **lapor**, jangan ganti tugas yang lebih mudah
 
 ---
 
+## 🔴 Slot sponsor (final, 5 Sept)
+
+| Slot | Track | Takeable |
+|---|---|---|
+| The Graph | Composable — jalur **skema terstandardisasi** (bukan MCP/Substreams) | $2.500 |
+| Uniswap Foundation | Best Uniswap Stack Contribution | $1.000 |
+| **ENS** | Best Use of ENSv2 — lihat `docs/ENS-PLAN.md` | $1.500 |
+
+~~Ledger~~ dibatalkan 5 Sept: `wallet-cli send` butuh perangkat fisik (tidak ada
+emulator/Speculos yang didokumentasikan), dan dukungan Sepolia tidak terkonfirmasi
+di dokumentasi mana pun. Dua risiko independen untuk satu slot.
+
+ENSv2 justru fit lebih baik: teks track meminta *"delegate specific rights"* lewat
+Enhanced Access Control dan subname yang *"expiring, revocable"* — itu tesis Envoyage
+di substrat lain. Alamat ENSv2 Sepolia sudah diverifikasi on-chain.
+
 ## Dokumen rujukan
 
 | File | Isi |
@@ -280,3 +296,6 @@ Jangan melompat. Kalau terblokir, **lapor**, jangan ganti tugas yang lebih mudah
 | `docs/SETUP-LANDMINES.md` | Enam ranjau setup; jangan utak-atik konfigurasi |
 | `docs/SEPOLIA.md` | Alamat terverifikasi + RPC yang jalan |
 | `docs/THREAT-MODEL.md` | Apa yang Envoyage TIDAK lindungi |
+| `docs/V4-ACTION-COMPLETENESS.md` | 26 aksi v4 ditelusuri ke nomor baris |
+| `docs/ENS-PLAN.md` | Slot ENSv2: mandate sebagai subname |
+| `docs/GRAPH-PLAN.md` | Jalur The Graph |
