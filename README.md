@@ -33,9 +33,36 @@ The keeper never sends calldata. It calls a typed entrypoint with two numbers, a
 
 Misuse is not rejected by a check — there is no channel in which to express it.
 
+## Live on Sepolia
+
+Deployed, verified, and exercised on a public chain — not only in tests.
+
+| | |
+|---|---|
+| **Envoyage** | [`0x8466e82E02edF3F00c0387D5C3E66d407dc7259C`](https://sepolia.etherscan.io/address/0x8466e82E02edF3F00c0387D5C3E66d407dc7259C#code) |
+| position | `38896`, ERC-721 approved to Envoyage — never to the keeper |
+| mandate | `1`, capped at 200 bps of harvested fees |
+| keeper | [`0xd643ee841bf365E4d5f46Bb9072B18a4cD056C5B`](https://sepolia.etherscan.io/address/0xd643ee841bf365E4d5f46Bb9072B18a4cD056C5B) |
+
+`compound()`, broadcast with the keeper's key. An address that owns nothing grew
+someone else's position:
+
+```
+liquidity before  100.000000000000000000
+liquidity after   100.614338692357009962
+delta               0.614338692357009962
+```
+
+`MandateExecuted` at block 11644474. The keeper's token balances match the emitted
+fee figures exactly, and Envoyage holds **0** of both tokens — so "non-custodial
+between transactions" is an on-chain fact here, not a design intention.
+
+See [`docs/SEPOLIA.md`](docs/SEPOLIA.md) for every address and the decoded event.
+
 ## Status
 
-**23 tests passing.** The core contract runs against real `v4-periphery`.
+**31 tests passing**, `forge lint` clean. The core contract runs against real
+`v4-periphery`.
 
 | File | Contents |
 |---|---|
@@ -94,7 +121,7 @@ Clone with submodules, then build. Verified green from a fresh clone:
 ```bash
 git clone --recurse-submodules https://github.com/envoyage-protocol/envoyage.git
 cd envoyage
-forge test          # 23 tests, all green
+forge test          # 31 tests, all green
 ```
 
 If you already cloned without `--recurse-submodules`:

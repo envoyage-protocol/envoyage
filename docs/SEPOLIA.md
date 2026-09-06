@@ -8,12 +8,19 @@ cost us an hour.
 
 ## Envoyage deployment
 
-| Contract | Address | Bytecode |
-|---|---|---|
-| **Envoyage** | `0x8466e82E02edF3F00c0387D5C3E66d407dc7259C` | 10128 B |
-| DemoToken (token0) | `0x1dC7e196Ff124C79191154C635df75a315e00985` | 3488 B |
-| DemoToken (token1) | `0x7D5Dc05acea592601e6888ccB04D625CDc6c13DC` | 3488 B |
-| DemoSwapper | `0x8A61cad8909BacC9a764f1b21451Afb3c6501D7A` | 3206 B |
+All four are **verified on Etherscan**, confirmed through the Etherscan API rather
+than by trusting the verifier's own report.
+
+| Contract | Address | Bytecode | Source |
+|---|---|---|---|
+| **Envoyage** | `0x8466e82E02edF3F00c0387D5C3E66d407dc7259C` | 10128 B | [verified](https://sepolia.etherscan.io/address/0x8466e82E02edF3F00c0387D5C3E66d407dc7259C#code) |
+| DemoToken — token0, "Envoyage Demo B" (EDB) | `0x1dC7e196Ff124C79191154C635df75a315e00985` | 3488 B | [verified](https://sepolia.etherscan.io/address/0x1dC7e196Ff124C79191154C635df75a315e00985#code) |
+| DemoToken — token1, "Envoyage Demo A" (EDA) | `0x7D5Dc05acea592601e6888ccB04D625CDc6c13DC` | 3488 B | [verified](https://sepolia.etherscan.io/address/0x7D5Dc05acea592601e6888ccB04D625CDc6c13DC#code) |
+| DemoSwapper | `0x8A61cad8909BacC9a764f1b21451Afb3c6501D7A` | 3206 B | [verified](https://sepolia.etherscan.io/address/0x8A61cad8909BacC9a764f1b21451Afb3c6501D7A#code) |
+
+Note the naming inversion: **token0 is "Demo B" and token1 is "Demo A"**. v4 requires
+currency0 < currency1 by address, and deployment order does not decide that, so the
+script sorts after deploying. The labels are cosmetic; the ordering is consensus.
 
 ## Uniswap v4 (pre-existing)
 
@@ -105,7 +112,17 @@ looks well-formed. It happened here: the clobbered `token1` was in fact the
 `envoyage` already has bytecode. Set `FORCE_REDEPLOY=1` to deploy a new instance on
 purpose. Verify with `cast code` regardless.
 
-## Still to do
+## Verification
 
-- [ ] Etherscan verification — no `ETHERSCAN_API_KEY` in `.env` yet.
-      Once set: `forge verify-contract 0x8466e82E02edF3F00c0387D5C3E66d407dc7259C src/Envoyage.sol:Envoyage --chain sepolia --watch`
+Done for all four contracts. If a redeploy is needed, `--compilation-profile default`
+is required — the cache holds both `default` and `test` profiles and the verifier
+refuses to guess between them:
+
+```bash
+forge verify-contract <address> src/Envoyage.sol:Envoyage \
+  --chain sepolia --watch --compilation-profile default \
+  --constructor-args $(cast abi-encode 'c(address,address,address)' \
+     0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4 \
+     0xE03A1074c86CFeDd5C142C4F04F1a1536e203543 \
+     0x000000000022D473030F116dDEE9F6B43aC78BA3)
+```
