@@ -27,3 +27,5 @@ broadcast/
 subgraph/node_modules/
 subgraph/build/
 subgraph/generated/
+web/node_modules/
+web/dist/
