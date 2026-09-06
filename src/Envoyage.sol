@@ -54,7 +54,7 @@ contract Envoyage is IEnvoyage {
     uint256 private _locked = 1;
 
     modifier nonReentrant() {
-        require(_locked == 1);
+        if (_locked != 1) revert Reentrancy();
         _locked = 2;
         _;
         _locked = 1;
@@ -162,6 +162,8 @@ contract Envoyage is IEnvoyage {
         emit MandateExecuted(mandateId, keeperFee0, keeperFee1, liquidityDelta);
     }
 
+    /// @dev See the note on _gate for why block.timestamp is the right clock here.
+    // forge-lint: disable-start(block-timestamp)
     function canCompound(uint256 mandateId) external view returns (bytes4) {
         Mandate storage m = mandates[mandateId];
         if (m.keeper == address(0)) return MandateInactive.selector;
@@ -172,10 +174,18 @@ contract Envoyage is IEnvoyage {
         return bytes4(0);
     }
 
+    // forge-lint: disable-end(block-timestamp)
+
     // ─────────────────────────────────────────────────────────────────────────
     // Internal
     // ─────────────────────────────────────────────────────────────────────────
 
+    /// @dev The block.timestamp comparisons below are intentional. Expiry and
+    ///      cooldown are denominated in hours and days; a validator can shift the
+    ///      timestamp by seconds. Neither bound is a security boundary at that
+    ///      resolution, and the alternative (block numbers) is worse on a chain
+    ///      with variable block times.
+    // forge-lint: disable-start(block-timestamp)
     function _gate(Mandate storage m) internal view {
         if (m.keeper == address(0)) revert MandateInactive();
         if (msg.sender != m.keeper) revert NotKeeper();
@@ -192,6 +202,7 @@ contract Envoyage is IEnvoyage {
         // H-04 class.
         if (IERC721(address(POSM)).ownerOf(m.tokenId) != m.grantor) revert OwnerChanged();
     }
+    // forge-lint: disable-end(block-timestamp)
 
     function _harvest(uint256 tokenId, PoolKey memory key) internal {
         bytes memory actions = abi.encodePacked(uint8(Actions.DECREASE_LIQUIDITY), uint8(Actions.TAKE_PAIR));
@@ -208,6 +219,10 @@ contract Envoyage is IEnvoyage {
     {
         bytes memory actions = abi.encodePacked(uint8(Actions.INCREASE_LIQUIDITY), uint8(Actions.SETTLE_PAIR));
         bytes[] memory params = new bytes[](2);
+        // These are amountMax slippage bounds. A truncating cast can only make a
+        // bound SMALLER, which makes POSM revert — it can never authorise
+        // overspending. Fails closed, so the cast is safe in this direction.
+        // forge-lint: disable-next-line(unsafe-typecast)
         params[0] = abi.encode(tokenId, uint256(liquidityDelta), uint128(max0), uint128(max1), bytes(""));
         params[1] = abi.encode(key.currency0, key.currency1);
         POSM.modifyLiquidities(abi.encode(actions, params), block.timestamp);
@@ -233,13 +248,25 @@ contract Envoyage is IEnvoyage {
         return token == address(0) ? address(this).balance : IERC20Minimal(token).balanceOf(address(this));
     }
 
+    /// @dev Checked transfer. A bare `token.transfer(...)` is unsound here: a token
+    ///      that signals failure by RETURNING FALSE rather than reverting would let
+    ///      the keeper-fee leg silently no-op. The ResidualBalance guard at the end
+    ///      of compound() happens to catch that case, but relying on a downstream
+    ///      invariant to cover a missing return check is how this class of bug
+    ///      survives review. Check it here, at the call.
+    ///
+    ///      Both shapes are accepted: standard ERC-20s return a bool, older
+    ///      non-standard ones (USDT among them) return nothing at all. Empty
+    ///      returndata is treated as success; any returndata must decode to true.
     function _transfer(Currency c, address to, uint256 amount) internal {
         address token = Currency.unwrap(c);
         if (token == address(0)) {
-            (bool ok,) = to.call{value: amount}("");
-            require(ok);
+            (bool sent,) = to.call{value: amount}("");
+            if (!sent) revert TransferFailed();
         } else {
-            IERC20Minimal(token).transfer(to, amount);
+            (bool ok, bytes memory data) =
+                token.call(abi.encodeWithSelector(IERC20Minimal.transfer.selector, to, amount));
+            if (!ok || (data.length != 0 && !abi.decode(data, (bool)))) revert TransferFailed();
         }
     }
 

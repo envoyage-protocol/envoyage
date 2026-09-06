@@ -38,6 +38,8 @@ interface IEnvoyage {
     error FeeCapTooHigh();
     error ZeroLiquidityDelta();
     error ResidualBalance();
+    error TransferFailed();
+    error Reentrancy();
 
     function grant(Mandate calldata m) external returns (uint256 mandateId);
     function revoke(uint256 mandateId) external;
