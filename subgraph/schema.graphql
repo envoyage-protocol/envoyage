@@ -1,0 +1,105 @@
+# Envoyage subgraph schema
+#
+# The entities below are shaped around one question a judge, an owner, or an
+# integrating protocol all ask differently: what is this keeper ALLOWED to do, and
+# what did it actually do? Most automation indexes only the second half, because the
+# first half does not exist on chain — an ERC-721 approval records no scope. Here it
+# does, so both halves are queryable and comparable.
+
+type Mandate @entity(immutable: false) {
+  "Decimal mandate id"
+  id: ID!
+  mandateId: BigInt!
+
+  keeper: Keeper!
+  "Owner at grant time. Set from msg.sender by the contract, so it cannot be forged."
+  grantor: Bytes!
+  position: Position!
+
+  # ── the scope, i.e. the part an approval cannot express ──────────────────
+  "Cap on the keeper's share, in bps of HARVESTED FEES — never of the position."
+  maxFeeBps: Int!
+  "Pinned at grant time and never mutable."
+  feeRecipient: Bytes!
+  expiry: BigInt!
+  "Cooldown in seconds; closes value extraction by repeated calls."
+  minInterval: BigInt!
+  compoundAllowed: Boolean!
+
+  status: MandateStatus!
+
+  grantedAt: BigInt!
+  grantedAtBlock: BigInt!
+  grantedTx: Bytes!
+  revokedAt: BigInt
+  revokedTx: Bytes
+
+  executions: [Execution!]! @derivedFrom(field: "mandate")
+  executionCount: Int!
+  lastExecutedAt: BigInt
+
+  # ── what actually happened, in the same units as the scope ───────────────
+  totalFee0ToKeeper: BigInt!
+  totalFee1ToKeeper: BigInt!
+  totalLiquidityAdded: BigInt!
+}
+
+enum MandateStatus {
+  ACTIVE
+  REVOKED
+}
+
+type Execution @entity(immutable: true) {
+  id: ID!
+  mandate: Mandate!
+  keeper: Keeper!
+
+  fee0ToKeeper: BigInt!
+  fee1ToKeeper: BigInt!
+  liquidityAdded: BigInt!
+
+  timestamp: BigInt!
+  block: BigInt!
+  tx: Bytes!
+  "Who paid gas. Should equal the mandate's keeper — recorded so it is checkable."
+  caller: Bytes!
+}
+
+type Keeper @entity(immutable: false) {
+  "Keeper address, lowercase hex"
+  id: ID!
+  mandateCount: Int!
+  activeMandateCount: Int!
+  executionCount: Int!
+  totalFee0Earned: BigInt!
+  totalFee1Earned: BigInt!
+  totalLiquidityAdded: BigInt!
+  firstSeenAt: BigInt!
+  mandates: [Mandate!]! @derivedFrom(field: "keeper")
+  executions: [Execution!]! @derivedFrom(field: "keeper")
+}
+
+type Position @entity(immutable: false) {
+  "Uniswap v4 PositionManager tokenId, as a decimal string"
+  id: ID!
+  tokenId: BigInt!
+  mandates: [Mandate!]! @derivedFrom(field: "position")
+  mandateCount: Int!
+  "Enforced on chain: a position may carry at most one live mandate."
+  hasActiveMandate: Boolean!
+  totalLiquidityAdded: BigInt!
+}
+
+"Single row, id = 'envoyage'. The numbers behind the pitch."
+type Protocol @entity(immutable: false) {
+  id: ID!
+  mandateCount: Int!
+  activeMandateCount: Int!
+  revokedMandateCount: Int!
+  executionCount: Int!
+  keeperCount: Int!
+  positionCount: Int!
+  totalLiquidityAdded: BigInt!
+  totalFee0ToKeepers: BigInt!
+  totalFee1ToKeepers: BigInt!
+}

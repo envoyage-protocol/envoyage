@@ -1,0 +1,39 @@
+specVersion: 1.0.0
+description: >-
+  Scoped keeper permissions for Uniswap v4 positions. Indexes the scope a position
+  owner granted alongside what the keeper actually did, so the two can be compared.
+repository: https://github.com/envoyage-protocol/envoyage
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: Envoyage
+    network: sepolia
+    source:
+      address: "0x8466e82E02edF3F00c0387D5C3E66d407dc7259C"
+      abi: Envoyage
+      # Contract creation block, read from the transaction receipt rather than from
+      # a broadcast artifact — the artifacts held two conflicting hashes after a
+      # `forge script --resume`, and only one of them was ever mined.
+      startBlock: 11644424
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      file: ./src/envoyage.ts
+      entities:
+        - Mandate
+        - Execution
+        - Keeper
+        - Position
+        - Protocol
+      abis:
+        - name: Envoyage
+          file: ./abis/Envoyage.json
+      eventHandlers:
+        - event: MandateGranted(indexed uint256,indexed address,indexed uint256)
+          handler: handleMandateGranted
+        - event: MandateExecuted(indexed uint256,uint256,uint256,uint128)
+          handler: handleMandateExecuted
+        - event: MandateRevoked(indexed uint256)
+          handler: handleMandateRevoked

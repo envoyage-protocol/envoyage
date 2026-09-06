@@ -24,3 +24,6 @@ subgraph/build/
 
 # forge broadcast artifacts (deployments/ is committed, run logs are not)
 broadcast/
+subgraph/node_modules/
+subgraph/build/
+subgraph/generated/
