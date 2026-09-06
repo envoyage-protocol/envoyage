@@ -43,7 +43,8 @@ contract DeployAndSeed is Base {
         DemoToken(t0).mint(deployer, TOKEN_SUPPLY);
         DemoToken(t1).mint(deployer, TOKEN_SUPPLY);
 
-        PoolKey memory key = PoolKey(Currency.wrap(t0), Currency.wrap(t1), DEMO_FEE, DEMO_TICK_SPACING, IHooks(address(0)));
+        PoolKey memory key =
+            PoolKey(Currency.wrap(t0), Currency.wrap(t1), DEMO_FEE, DEMO_TICK_SPACING, IHooks(address(0)));
         POOL_MANAGER.initialize(key, SQRT_PRICE_1_1);
 
         _approveThroughPermit2(t0);
@@ -111,6 +112,9 @@ contract DeployAndSeed is Base {
         vm.serializeString(o, "poolManager", vm.toString(address(POOL_MANAGER)));
         vm.serializeString(o, "positionManager", vm.toString(address(POSM)));
         vm.serializeString(o, "fee", vm.toString(uint256(DEMO_FEE)));
+        // DEMO_TICK_SPACING is a positive compile-time constant, so widening it is
+        // exact. Recorded here rather than muted so the reasoning survives.
+        // forge-lint: disable-next-line(unsafe-typecast)
         vm.serializeString(o, "tickSpacing", vm.toString(uint256(uint24(DEMO_TICK_SPACING))));
         string memory out = vm.serializeString(o, "tokenId", vm.toString(tokenId));
         vm.writeJson(out, DEPLOYMENTS);

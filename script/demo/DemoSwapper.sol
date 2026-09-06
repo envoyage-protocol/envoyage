@@ -20,6 +20,7 @@ contract DemoSwapper is IUnlockCallback {
     IPoolManager public immutable MANAGER;
 
     error OnlyPoolManager();
+    error SettleFailed();
 
     struct CallbackData {
         PoolKey key;
@@ -52,11 +53,21 @@ contract DemoSwapper is IUnlockCallback {
     ///      import from a test tree.
     function _resolve(Currency currency, int128 amount, address who) internal {
         if (amount < 0) {
+            // Negation of type(int128).min would overflow; Solidity >=0.8 reverts on
+            // it, so the cast below can only ever see a representable magnitude.
+            // forge-lint: disable-next-line(unsafe-typecast)
             uint256 owed = uint256(uint128(-amount));
+
             MANAGER.sync(currency);
-            IERC20Minimal(Currency.unwrap(currency)).transferFrom(who, address(MANAGER), owed);
+            // Checked, for the same reason as Envoyage._transfer: a token that
+            // returns false rather than reverting would leave the pool unsettled and
+            // the failure would surface later as an unrelated revert inside unlock.
+            (bool ok, bytes memory data) = Currency.unwrap(currency)
+                .call(abi.encodeWithSelector(IERC20Minimal.transferFrom.selector, who, address(MANAGER), owed));
+            if (!ok || (data.length != 0 && !abi.decode(data, (bool)))) revert SettleFailed();
             MANAGER.settle();
         } else if (amount > 0) {
+            // forge-lint: disable-next-line(unsafe-typecast)
             MANAGER.take(currency, who, uint256(uint128(amount)));
         }
     }

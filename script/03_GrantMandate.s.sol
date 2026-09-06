@@ -46,6 +46,8 @@ contract GrantMandate is Base {
         console2.log("keeper    ", keeper);
         console2.log("fee cap   ", FEE_BPS, "bps of harvested fees");
         console2.log("");
-        console2.log("next: MANDATE_ID=%s forge script script/04_Compound.s.sol --rpc-url sepolia --broadcast", mandateId);
+        console2.log(
+            "next: MANDATE_ID=%s forge script script/04_Compound.s.sol --rpc-url sepolia --broadcast", mandateId
+        );
     }
 }
