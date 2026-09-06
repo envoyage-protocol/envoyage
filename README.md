@@ -61,8 +61,8 @@ See [`docs/SEPOLIA.md`](docs/SEPOLIA.md) for every address and the decoded event
 
 ## Status
 
-**31 tests passing**, `forge lint` clean. The core contract runs against real
-`v4-periphery`.
+**38 tests passing** across 8 files, `forge lint` clean over `src`, `script` and
+`test`. The core contract runs against real `v4-periphery`.
 
 | File | Contents |
 |---|---|
@@ -71,6 +71,8 @@ See [`docs/SEPOLIA.md`](docs/SEPOLIA.md) for every address and the decoded event
 | [`test/unit/Spike.t.sol`](test/unit/Spike.t.sol) | proof the v4 flow is traversable without a swap |
 | [`test/unit/Envoyage.t.sol`](test/unit/Envoyage.t.sol) | 16 gating and fee-accounting tests |
 | [`test/replay/`](test/replay/) | documented exploits, replayed against a vulnerable comparator |
+| [`test/invariant/`](test/invariant/) | 5 properties over 12,800 calls; the keeper is fuzzed as an adversary |
+| [`test/unit/Immutability.t.sol`](test/unit/Immutability.t.sol) | asserts against deployed bytecode, not source |
 
 ### What is proven, with numbers
 
@@ -96,9 +98,25 @@ that shows the identical attack draining the contract next to it is not.
 - Position sold → `compound` reverts — `test_revert_positionSoldToNewOwner` (Code4rena H-04 class)
 - Envoyage's balance is zero at the end of every tx — non-custodial between transactions
 - `grantor` is taken from `msg.sender`, never from the struct — unforgeable
+- Deployed bytecode contains no `DELEGATECALL`, `SELFDESTRUCT` or `CALLCODE`, and no
+  arbitrary-call or admin selector resolves — checked against the artifact, with a
+  negative control so the scanner cannot pass by being broken
 
 See [`AGENTS.md`](AGENTS.md) for build rules and [`docs/`](docs/) for findings verified
 against the v4 source.
+
+## Components
+
+| | |
+|---|---|
+| [`src/`](src/) | the contract |
+| [`script/`](script/) | Sepolia deploy + demo seeding, rehearsed on a fork first |
+| [`subgraph/`](subgraph/) | indexes granted scope beside actual behaviour; 5 matchstick tests |
+| [`keeper/`](keeper/) | reference bot, verified compounding unattended on Sepolia |
+| [`web/`](web/) | reads live state directly from Sepolia, no backend or indexer |
+
+See [`AI-USAGE.md`](AI-USAGE.md) for the required AI disclosure, including the five
+things AI got wrong here and how each was caught.
 
 ## Layout
 
@@ -121,7 +139,7 @@ Clone with submodules, then build. Verified green from a fresh clone:
 ```bash
 git clone --recurse-submodules https://github.com/envoyage-protocol/envoyage.git
 cd envoyage
-forge test          # 31 tests, all green
+forge test          # 38 tests, all green
 ```
 
 If you already cloned without `--recurse-submodules`:
