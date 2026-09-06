@@ -11,9 +11,10 @@ optimizer_runs = 44444444
 bytecode_hash = "none"
 gas_limit = "3000000000"
 ffi = false
-fs_permissions = [{ access = "read", path = "./" }]
+fs_permissions = [{ access = "read", path = "./" }, { access = "read-write", path = "./deployments" }]
 
-# Cerminan konfigurasi v4-periphery. TANPA blok ini: stack-too-deep di jalur test.
+# Mirrors v4-periphery's own compiler config. WITHOUT this block: stack-too-deep
+# on the test path. See docs/SETUP-LANDMINES.md.
 additional_compiler_profiles = [
   { name = "posm",       via_ir = true,  optimizer_runs = 500 },
   { name = "descriptor", via_ir = true,  optimizer_runs = 1 },

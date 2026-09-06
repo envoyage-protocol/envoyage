@@ -21,3 +21,6 @@ subgraph/build/
 
 # os
 .DS_Store
+
+# forge broadcast artifacts (deployments/ is committed, run logs are not)
+broadcast/
