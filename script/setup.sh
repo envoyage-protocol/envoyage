@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Install dependency open-source. Starter kit generik, bukan kode proyek.
+# Installs open-source dependencies. Generic starter-kit setup, not project code.
 #
-# HANYA DUA DEP. v4-core, permit2, openzeppelin, dan solmate SENGAJA TIDAK
-# di-install standalone — v4-periphery sudah membawa versi yang cocok, dan versi
-# standalone-nya TIDAK kompatibel. Lihat docs/SETUP-LANDMINES.md #3 dan #4.
+# EXACTLY TWO DEPENDENCIES. v4-core, permit2, openzeppelin and solmate are
+# DELIBERATELY not installed standalone — v4-periphery already vendors compatible
+# versions, and the standalone versions are NOT compatible with it.
+# See docs/SETUP-LANDMINES.md #3 and #4.
 #
-# SHA dipin: seluruh investigasi semalam adalah perburuan ketidakcocokan versi.
-# Jangan un-pin tanpa menjalankan ulang test/_HarnessProbe.t.sol.
+# The SHAs are pinned: an entire night of investigation was version-mismatch
+# hunting. Do not un-pin without re-running test/_HarnessProbe.t.sol.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
