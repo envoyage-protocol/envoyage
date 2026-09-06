@@ -1,111 +1,124 @@
 # Envoyage
 
-**Envoyage menghapus wewenang atas tujuan. Ia tidak menghapus wewenang atas eksekusi.**
+**Envoyage removes authority over intent. It does not remove authority over execution.**
 
-Instrumen izin ter-scope untuk posisi Uniswap v4. Pemilik posisi bisa menyewa keeper
-tanpa menyerahkan `approve` atau `setApprovalForAll`.
+A scoped-permission instrument for Uniswap v4 positions. A position owner can hire a
+keeper without handing over `approve` or `setApprovalForAll`.
 
 > ETHOnline 2026 · Sepolia · net-new (Start Fresh track)
-> Kode proyek dimulai setelah 4 Sept 2026 12:00 EDT.
+> Project code began after 4 Sept 2026, 12:00 EDT.
 
 ---
 
-## Masalah
+## The problem
 
-Untuk memberi keeper wewenang atas posisi v4, hari ini hanya ada dua pilihan:
+To give a keeper authority over a v4 position, today there are exactly two options:
 
-| Primitif | Posisi mana | Aksi mana |
+| Primitive | Which position | Which action |
 |---|---|---|
-| `setApprovalForAll(keeper, true)` | semuanya | **tanpa batas** |
-| `approve(keeper, tokenId)` | satu | **tanpa batas** |
-| **Mandate** | satu | **terdaftar** |
+| `setApprovalForAll(keeper, true)` | all of them | **unbounded** |
+| `approve(keeper, tokenId)` | one | **unbounded** |
+| **Mandate** | one | **enumerated** |
 
-Keduanya membatasi *posisi mana*, tidak ada yang membatasi *aksi apa*.
+Both constrain *which position*. Neither constrains *what may be done to it*.
 
-Diperburuk arsitektur v4: `modifyLiquidities` adalah satu entrypoint yang menerima
-array aksi — sebuah bahasa kecil. Membatasi keeper "hanya boleh memanggil
-modifyLiquidities" tidak membatasi apa pun, karena fungsi itu sendiri adalah interpreter.
+v4's architecture sharpens this: `modifyLiquidities` is a single entrypoint that takes
+an array of actions — a small language. Restricting a keeper to "may only call
+modifyLiquidities" restricts nothing, because that function is itself an interpreter.
 
-## Pendekatan: menyusun, bukan memvalidasi
+## The approach: assemble, don't validate
 
-Keeper tidak pernah mengirim calldata. Ia memanggil entrypoint bertipe dengan dua angka,
-dan **Envoyage yang menyusun** array aksi v4 dengan recipient sebagai konstanta.
+The keeper never sends calldata. It calls a typed entrypoint with two numbers, and
+**Envoyage assembles** the v4 action array itself, with the recipient as a constant.
 
-Penyalahgunaan bukan ditolak oleh pemeriksaan — tidak ada saluran untuk mengekspresikannya.
+Misuse is not rejected by a check — there is no channel in which to express it.
 
 ## Status
 
-**19 test hijau.** Kontrak inti berjalan terhadap `v4-periphery` asli.
+**23 tests passing.** The core contract runs against real `v4-periphery`.
 
-| Berkas | Isi |
+| File | Contents |
 |---|---|
-| [`src/Envoyage.sol`](src/Envoyage.sol) | registry mandate + penyusun aksi v4 |
-| [`src/interfaces/IEnvoyage.sol`](src/interfaces/IEnvoyage.sol) | ABI publik, custom error |
-| [`test/unit/Spike.t.sol`](test/unit/Spike.t.sol) | bukti alur v4 bisa dilalui tanpa swap |
-| [`test/unit/Envoyage.t.sol`](test/unit/Envoyage.t.sol) | 16 test gerbang & akuntansi fee |
+| [`src/Envoyage.sol`](src/Envoyage.sol) | mandate registry + v4 action assembler |
+| [`src/interfaces/IEnvoyage.sol`](src/interfaces/IEnvoyage.sol) | public ABI, custom errors |
+| [`test/unit/Spike.t.sol`](test/unit/Spike.t.sol) | proof the v4 flow is traversable without a swap |
+| [`test/unit/Envoyage.t.sol`](test/unit/Envoyage.t.sol) | 16 gating and fee-accounting tests |
+| [`test/replay/`](test/replay/) | documented exploits, replayed against a vulnerable comparator |
 
-### Yang sudah terbukti, dengan angka
-
-```
-fee dipanen         : 0.06 e18 tiap token
-likuiditas sebelum  : 100.000000000000000000 e18
-likuiditas sesudah  : 100.626876216690826481 e18   ← tanpa swap
-```
-
-- `PositionManager` **menolak** `SWAP_EXACT_IN_SINGLE` — `test_spike_positionManagerRejectsSwapAction`
-- Posisi dijual → `compound` revert — `test_revert_positionSoldToNewOwner` (kelas Code4rena H-04)
-- Saldo Envoyage nol di akhir tiap tx — non-kustodial antar-transaksi
-- `grantor` diambil dari `msg.sender`, bukan dari struct — anti pemalsuan
-
-Lihat [`AGENTS.md`](AGENTS.md) untuk aturan build dan [`docs/`](docs/) untuk
-temuan terverifikasi terhadap source v4.
-
-## Struktur
+### What is proven, with numbers
 
 ```
-src/interfaces/   ABI publik + custom error
-src/adapters/     penyusun aksi per protokol (v0: Uniswap v4)
-test/unit/        gerbang, akuntansi fee, expiry
-test/invariant/   properti + handler; keeper diperlakukan sebagai penyerang
-test/replay/      pola eksploit terdokumentasi vs kontrak rentan pembanding
-script/           deploy + seed pool Sepolia
-subgraph/         event mandate → Subgraph Studio
+fees harvested   : 0.06 e18 per token
+liquidity before : 100.000000000000000000 e18
+liquidity after  : 100.626876216690826481 e18   <- with no swap
+```
+
+The exploit replay is deliberately **paired**: every attack runs once against
+`NaiveUtils` (a comparator built to be vulnerable, reproducing the Revert V3Utils
+pattern) and once against Envoyage.
+
+```
+H-04 vs NaiveUtils -- token0 stolen: 4757902903361556095
+keeper received (capped at 2%):      1200000000000000
+```
+
+A test that only shows Envoyage lacks the vulnerable function is a tautology. A test
+that shows the identical attack draining the contract next to it is not.
+
+- `PositionManager` **rejects** `SWAP_EXACT_IN_SINGLE` — `test_spike_positionManagerRejectsSwapAction`
+- Position sold → `compound` reverts — `test_revert_positionSoldToNewOwner` (Code4rena H-04 class)
+- Envoyage's balance is zero at the end of every tx — non-custodial between transactions
+- `grantor` is taken from `msg.sender`, never from the struct — unforgeable
+
+See [`AGENTS.md`](AGENTS.md) for build rules and [`docs/`](docs/) for findings verified
+against the v4 source.
+
+## Layout
+
+```
+src/interfaces/   public ABI + custom errors
+src/adapters/     per-protocol action assemblers (v0: Uniswap v4)
+test/unit/        gating, fee accounting, expiry
+test/invariant/   properties + handlers; the keeper is treated as an attacker
+test/replay/      documented exploit patterns vs a vulnerable comparator contract
+script/           deploy + Sepolia pool seeding
+subgraph/         mandate events -> Subgraph Studio
 keeper/           reference keeper bot
-web/              UI: terbitkan mandate + halaman mandate publik
+web/              UI: issue a mandate + public mandate page
 ```
 
 ## Setup
 
-Clone dengan submodule, lalu build. Terbukti hijau dari clone segar:
+Clone with submodules, then build. Verified green from a fresh clone:
 
 ```bash
 git clone --recurse-submodules https://github.com/envoyage-protocol/envoyage.git
 cd envoyage
-forge test          # 19 test, semua hijau
+forge test          # 23 tests, all green
 ```
 
-Kalau sudah terlanjur clone tanpa `--recurse-submodules`:
+If you already cloned without `--recurse-submodules`:
 
 ```bash
-./script/setup.sh     # install dependency v4
-cp .env.example .env  # isi RPC + key
+./script/setup.sh     # install v4 dependencies at pinned SHAs
+cp .env.example .env  # fill in RPC + keys
 forge build
 forge test
 ```
 
-Profil test:
+Test profiles:
 ```bash
-forge test                                   # default, 1000 fuzz run
-FOUNDRY_PROFILE=quick   forge test           # iterasi cepat
-FOUNDRY_PROFILE=deep    forge test           # 10.000 invariant run (untuk DoD)
+forge test                                   # default, 1000 fuzz runs
+FOUNDRY_PROFILE=quick   forge test           # fast iteration
+FOUNDRY_PROFILE=deep    forge test           # 10,000 invariant runs (for DoD)
 ```
 
-## Model ancaman
+## Threat model
 
-Lihat [`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md). Ringkasnya: klaimnya adalah
-**pengurangan permukaan serangan**, bukan keamanan absolut. Yang **tidak** dilindungi
-dinyatakan eksplisit di sana.
+See [`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md). In short: the claim is **attack
+surface reduction**, not absolute security. What is **not** protected is stated
+explicitly there.
 
-## Lisensi
+## License
 
 MIT
