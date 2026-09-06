@@ -18,16 +18,16 @@ import {IERC721} from "openzeppelin-contracts/contracts/interfaces/IERC721.sol";
 import {IEnvoyage} from "./interfaces/IEnvoyage.sol";
 
 /// @title Envoyage
-/// @notice Envoyage menghapus wewenang atas TUJUAN. Ia tidak menghapus wewenang
-///         atas EKSEKUSI.
+/// @notice Envoyage removes authority over INTENT. It does not remove authority
+///         over EXECUTION.
 ///
-/// @dev IMMUTABLE BY CONSTRUCTION — properti keamanan, bukan kelalaian:
-///      tanpa proxy, tanpa owner/admin, tanpa fungsi upgrade, tanpa delegatecall,
-///      tanpa selfdestruct, dan TIDAK ADA fungsi yang menerima `bytes calldata`
-///      atau `address target` dari pemanggil. Kalau salah satu dilanggar, klaim
-///      "Envoyage tidak menerima instruksi" menjadi SALAH, bukan sekadar lemah:
-///      satu kontrak yang mengagregasi approval banyak pemilik adalah honeypot
-///      yang lebih menarik daripada approval yang tersebar.
+/// @dev IMMUTABLE BY CONSTRUCTION — a security property, not an oversight:
+///      no proxy, no owner/admin, no upgrade function, no delegatecall, no
+///      selfdestruct, and NO function that accepts `bytes calldata` or an
+///      `address target` from the caller. Violate any one of those and the claim
+///      "Envoyage takes no instructions" becomes FALSE rather than merely weak:
+///      a single contract aggregating many owners' approvals is a far more
+///      attractive honeypot than those approvals left scattered.
 contract Envoyage is IEnvoyage {
     using StateLibrary for IPoolManager;
     using PositionInfoLibrary for PositionInfo;
@@ -36,17 +36,17 @@ contract Envoyage is IEnvoyage {
     IPoolManager public immutable POOL_MANAGER;
     IAllowanceTransfer public immutable PERMIT2;
 
-    /// @dev cap keras: keeper tidak boleh mengambil lebih dari 10% fee yang dipanen,
-    ///      berapa pun yang diminta pemilik saat grant.
+    /// @dev Hard ceiling: a keeper may never take more than 10% of harvested fees,
+    ///      no matter what the owner asks for at grant time.
     uint16 public constant MAX_FEE_BPS_CEILING = 1_000;
 
     mapping(uint256 mandateId => Mandate) public mandates;
 
-    /// @notice Satu tokenId hanya boleh punya SATU mandate hidup.
-    /// @dev Tidak bisa ditegakkan dari struct saja — Mandate di-key oleh mandateId,
-    ///      jadi revoke-lalu-grant menghasilkan id kedua untuk tokenId yang sama dan
-    ///      tidak ada apa pun untuk diperiksa. Mapping ini adalah penegaknya.
-    ///      0 berarti tidak ada; karena itu mandateId mulai dari 1.
+    /// @notice A tokenId may have exactly ONE live mandate.
+    /// @dev This cannot be enforced from the struct alone — Mandate is keyed by
+    ///      mandateId, so revoke-then-grant produces a second id for the same
+    ///      tokenId with nothing to check against. This mapping is the enforcer.
+    ///      0 means absent, which is why mandateId starts at 1.
     mapping(uint256 tokenId => uint256 mandateId) public activeMandate;
 
     uint256 public nextMandateId = 1;
@@ -79,10 +79,10 @@ contract Envoyage is IEnvoyage {
 
         Mandate storage s = mandates[mandateId];
         s.keeper = m.keeper;
-        s.grantor = msg.sender; // BUKAN m.grantor — pemberi grant tidak bisa memalsukan ini
+        s.grantor = msg.sender; // NOT m.grantor — the grantor cannot forge this
         s.tokenId = m.tokenId;
         s.maxFeeBps = m.maxFeeBps;
-        s.feeRecipient = m.feeRecipient; // dikunci selamanya di sini
+        s.feeRecipient = m.feeRecipient; // pinned here, forever
         s.expiry = m.expiry;
         s.minInterval = m.minInterval;
         s.lastCall = 0;
@@ -92,7 +92,7 @@ contract Envoyage is IEnvoyage {
         emit MandateGranted(mandateId, m.keeper, m.tokenId);
     }
 
-    /// @notice Seketika, tanpa jeda. Keeper yang sedang berjalan akan revert.
+    /// @notice Immediate, with no delay. An in-flight keeper call reverts.
     function revoke(uint256 mandateId) external {
         Mandate storage m = mandates[mandateId];
         if (m.grantor != msg.sender) revert NotPositionOwner();
@@ -106,7 +106,7 @@ contract Envoyage is IEnvoyage {
     // Compound
     // ─────────────────────────────────────────────────────────────────────────
 
-    /// @notice Dua angka. Tidak ada calldata, tidak ada tujuan, tidak ada rute.
+    /// @notice Two numbers. No calldata, no destination, no route.
     function compound(uint256 mandateId, uint256 minFee) external nonReentrant {
         Mandate storage m = mandates[mandateId];
         _gate(m);
@@ -115,7 +115,7 @@ contract Envoyage is IEnvoyage {
 
         (PoolKey memory key, PositionInfo info) = POSM.getPoolAndPositionInfo(m.tokenId);
 
-        // ── 1. Panen. Tidak ada aksi "collect" di v4 — decrease dengan 0. ────
+        // ── 1. Harvest. v4 has no "collect" action — decrease by 0. ──────────
         uint256 b0 = _balance(key.currency0);
         uint256 b1 = _balance(key.currency1);
         _harvest(m.tokenId, key);
@@ -124,7 +124,7 @@ contract Envoyage is IEnvoyage {
 
         if (fee0 + fee1 < minFee) revert FeeBelowMinimum();
 
-        // ── 2. Fee keeper, dari fee yang dipanen saja, ke recipient terkunci. ─
+        // ── 2. Keeper fee, on harvested fees only, to the pinned recipient. ──
         uint256 keeperFee0 = (fee0 * m.maxFeeBps) / 10_000;
         uint256 keeperFee1 = (fee1 * m.maxFeeBps) / 10_000;
         if (keeperFee0 > 0) _transfer(key.currency0, m.feeRecipient, keeperFee0);
@@ -133,7 +133,7 @@ contract Envoyage is IEnvoyage {
         uint256 add0 = fee0 - keeperFee0;
         uint256 add1 = fee1 - keeperFee1;
 
-        // ── 3. Hitung delta TANPA swap. Tidak ada harga untuk dimanipulasi. ──
+        // ── 3. Size the delta WITHOUT a swap. No price to manipulate. ────────
         (uint160 sqrtPriceX96,,,) = POOL_MANAGER.getSlot0(key.toId());
         uint128 liquidityDelta = LiquidityAmounts.getLiquidityForAmounts(
             sqrtPriceX96,
@@ -142,21 +142,21 @@ contract Envoyage is IEnvoyage {
             add0,
             add1
         );
-        // Tanpa gerbang ini, INCREASE jadi no-op yang SUKSES: event tetap terbit
-        // dan demo terlihat jalan padahal tidak terjadi apa-apa.
+        // Without this gate, INCREASE becomes a SUCCEEDING no-op: the event still
+        // fires and the demo looks alive while nothing at all happened.
         if (liquidityDelta == 0) revert ZeroLiquidityDelta();
 
-        // ── 4. Tanam kembali. ────────────────────────────────────────────────
+        // ── 4. Reinvest. ─────────────────────────────────────────────────────
         _approvePermit2(key.currency0);
         _approvePermit2(key.currency1);
         _increase(m.tokenId, key, liquidityDelta, add0, add1);
 
-        // ── 5. Dust ke PEMILIK. Konstanta, bukan parameter. ──────────────────
+        // ── 5. Dust goes to the OWNER. A constant, never a parameter. ────────
         address owner = IERC721(address(POSM)).ownerOf(m.tokenId);
         _sweep(key.currency0, owner);
         _sweep(key.currency1, owner);
 
-        // Non-kustodial ANTAR-transaksi: saldo hanya ada di dalam satu tx.
+        // Non-custodial BETWEEN transactions: a balance exists only within one tx.
         if (_balance(key.currency0) != 0 || _balance(key.currency1) != 0) revert ResidualBalance();
 
         emit MandateExecuted(mandateId, keeperFee0, keeperFee1, liquidityDelta);
@@ -181,14 +181,15 @@ contract Envoyage is IEnvoyage {
         if (msg.sender != m.keeper) revert NotKeeper();
         if (!m.compoundAllowed) revert CompoundNotAllowed();
         if (block.timestamp > m.expiry) revert MandateExpired();
-        // lastCall == 0 berarti belum pernah dipanggil; mandate baru langsung boleh.
-        // Tanpa pengecualian ini, `block.timestamp < 0 + minInterval` bernilai benar
-        // pada chain ber-timestamp kecil (mis. anvil/Foundry mulai dari 1) dan
-        // mandate baru tidak akan pernah bisa dipakai. Di mainnet bug ini tidak
-        // terlihat karena timestamp besar — justru itu sebabnya ia berbahaya.
+        // lastCall == 0 means never called; a fresh mandate is immediately usable.
+        // Without this exemption, `block.timestamp < 0 + minInterval` is true on a
+        // chain with small timestamps (anvil/Foundry starts at 1) and a new mandate
+        // could never be used at all. On mainnet the bug is invisible because
+        // timestamps are large — which is precisely what makes it dangerous.
         if (m.lastCall != 0 && block.timestamp < uint256(m.lastCall) + m.minInterval) revert CooldownActive();
-        // Tanpa ini, mandate bertahan setelah posisi dijual: penjual mempertahankan
-        // hak compound atas posisi pembeli. Itu kelas Code4rena H-04.
+        // Without this, a mandate survives the sale of the position: the seller
+        // keeps compound rights over the buyer's position. That is the Code4rena
+        // H-04 class.
         if (IERC721(address(POSM)).ownerOf(m.tokenId) != m.grantor) revert OwnerChanged();
     }
 
@@ -196,8 +197,8 @@ contract Envoyage is IEnvoyage {
         bytes memory actions = abi.encodePacked(uint8(Actions.DECREASE_LIQUIDITY), uint8(Actions.TAKE_PAIR));
         bytes[] memory params = new bytes[](2);
         params[0] = abi.encode(tokenId, uint256(0), uint128(0), uint128(0), bytes(""));
-        // recipient = address(this) SEBAGAI LITERAL, bukan ActionConstants.ADDRESS_THIS
-        // (konstanta itu berarti PositionManager, bukan kontrak ini).
+        // recipient = address(this) AS A LITERAL, not ActionConstants.ADDRESS_THIS
+        // (that constant means the PositionManager, not this contract).
         params[1] = abi.encode(key.currency0, key.currency1, address(this));
         POSM.modifyLiquidities(abi.encode(actions, params), block.timestamp);
     }
@@ -212,9 +213,9 @@ contract Envoyage is IEnvoyage {
         POSM.modifyLiquidities(abi.encode(actions, params), block.timestamp);
     }
 
-    /// @dev POSM membayar lewat Permit2 ketika payer bukan POSM sendiri, dan di sini
-    ///      payer adalah Envoyage. Tanpa dua approval ini: lolos di unit test bermock,
-    ///      meledak pertama kali di jaringan sungguhan.
+    /// @dev POSM pays through Permit2 whenever the payer is not POSM itself, and
+    ///      here the payer is Envoyage. Without both approvals: green against
+    ///      mocked unit tests, and a failure on the very first real network call.
     function _approvePermit2(Currency c) internal {
         address token = Currency.unwrap(c);
         if (token == address(0)) return;
