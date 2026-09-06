@@ -110,6 +110,9 @@ contract SpikeTest is PosmTestSetup {
         Plan memory p2 = Planner.init();
         p2.add(
             Actions.INCREASE_LIQUIDITY,
+            // amountMax slippage bounds. A truncating cast can only lower a bound,
+            // which makes POSM revert; it can never authorise overspending.
+            // forge-lint: disable-next-line(unsafe-typecast)
             abi.encode(tokenId, uint256(liquidityDelta), uint128(fee0), uint128(fee1), bytes(""))
         );
         bytes memory increaseCalls = p2.finalizeModifyLiquidityWithSettlePair(key);

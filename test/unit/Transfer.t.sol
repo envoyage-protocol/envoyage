@@ -54,7 +54,8 @@ contract TransferTest is Test {
     address recipient = makeAddr("recipient");
 
     function setUp() public {
-        harness = new EnvoyageHarness(IPositionManager(address(1)), IPoolManager(address(2)), IAllowanceTransfer(address(3)));
+        harness =
+            new EnvoyageHarness(IPositionManager(address(1)), IPoolManager(address(2)), IAllowanceTransfer(address(3)));
     }
 
     /// @notice The regression this guards. Before the return-value check, this call

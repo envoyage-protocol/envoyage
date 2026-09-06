@@ -40,7 +40,10 @@ shrink_run_limit = 5000
 
 [profile.quick.invariant]
 runs = 16
-depth = 15
+# Depth 15 was too shallow to reach the interesting state: a sequence has to grant,
+# then accrue fees, then compound, in that order. At depth 15 zero compounds landed
+# across a whole run and every invariant passed vacuously.
+depth = 100
 
 [profile.deep.invariant]
 runs = 10000
