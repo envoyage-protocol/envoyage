@@ -26,6 +26,27 @@ abstract contract Base is Script {
 
     string constant DEPLOYMENTS = "deployments/sepolia.json";
 
+    error WouldClobberLiveDeployment();
+
+    /// @notice Refuses to overwrite a deployments file that already points at live
+    ///         code, unless FORCE_REDEPLOY is set.
+    ///
+    /// @dev This is not defensive decoration. `forge script --resume` re-simulates
+    ///      from the CURRENT nonce, so every CREATE address it computes differs from
+    ///      the ones already deployed — and the script then happily recorded those
+    ///      never-deployed addresses over the real ones. The failure is silent: the
+    ///      file still looks well-formed, and the next script fails somewhere else
+    ///      entirely with "call to non-contract address". A deployments file must
+    ///      record what was broadcast, never what a simulation predicted.
+    function _guardDeployments() internal view {
+        if (vm.envOr("FORCE_REDEPLOY", uint256(0)) == 1) return;
+        try vm.readFile(DEPLOYMENTS) returns (string memory raw) {
+            if (bytes(raw).length == 0) return;
+            address existing = vm.parseAddress(vm.parseJsonString(raw, ".envoyage"));
+            if (existing.code.length > 0) revert WouldClobberLiveDeployment();
+        } catch {}
+    }
+
     function _read(string memory key) internal view returns (string memory) {
         return vm.parseJsonString(vm.readFile(DEPLOYMENTS), string.concat(".", key));
     }

@@ -19,3 +19,14 @@ This is not a style preference. Envoyage is an ETHGlobal ETHOnline submission re
 by an international judging panel; the source is part of the submission.
 
 Conversation with the author may be in any language. The repository may not.
+
+## Deployment records
+
+A deployments file records what was **broadcast**, never what a simulation
+predicted. `forge script --resume` re-simulates from the current nonce, so every
+CREATE address it computes differs from what is already on chain; an unguarded
+write silently replaces live addresses with addresses that were never deployed.
+
+`Base.s.sol::_guardDeployments` refuses to overwrite a file whose recorded
+`envoyage` already has bytecode. Set `FORCE_REDEPLOY=1` to deploy a new instance
+deliberately. Always re-verify addresses with `cast code` before trusting the file.

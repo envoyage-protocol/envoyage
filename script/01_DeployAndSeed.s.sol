@@ -25,6 +25,8 @@ contract DeployAndSeed is Base {
     uint256 constant TOKEN_SUPPLY = 1_000_000e18;
 
     function run() external {
+        _guardDeployments();
+
         uint256 pk = vm.envUint("DEPLOYER_PRIVATE_KEY");
         address deployer = vm.addr(pk);
         console2.log("deployer", deployer);
