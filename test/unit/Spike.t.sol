@@ -15,23 +15,23 @@ import {PosmTestSetup} from "v4-periphery-test/shared/PosmTestSetup.sol";
 import {PositionConfig} from "v4-periphery-test/shared/PositionConfig.sol";
 import {Planner, Plan} from "v4-periphery-test/shared/Planner.sol";
 
-/// @notice SPIKE INTEGRASI — gerbang Blok A.
-/// Tujuan tunggal: membuktikan alur `compound` bisa dilalui terhadap v4-periphery
-/// ASLI, sebelum menulis kontrak Envoyage. Belum ada Envoyage di sini.
+/// @notice INTEGRATION SPIKE — the Block A gate.
+/// Single purpose: prove the `compound` flow is traversable against REAL
+/// v4-periphery before writing the Envoyage contract. There is no Envoyage here.
 ///
-/// Membuktikan tiga hal yang seluruh desain bergantung padanya:
-///  1. panen fee = DECREASE_LIQUIDITY dengan liquidity 0 (tidak ada aksi "collect")
-///  2. fee bisa didaratkan ke alamat pihak ketiga lewat TAKE_PAIR
-///  3. likuiditas bisa ditambah kembali TANPA swap, dan naik secara terukur
+/// It establishes the three facts the whole design rests on:
+///  1. harvesting fees == DECREASE_LIQUIDITY with liquidity 0 (v4 has no "collect")
+///  2. fees can be landed on a third-party address via TAKE_PAIR
+///  3. liquidity can be added back WITHOUT a swap, and measurably increases
 contract SpikeTest is PosmTestSetup {
     using StateLibrary for *;
 
     PositionConfig cfg;
     uint256 tokenId;
 
-    /// @dev fee 1% (bukan 0,3%) supaya fee terlihat dari sedikit swap.
-    /// Fee kecil -> getLiquidityForAmounts mengembalikan 0 -> INCREASE jadi no-op
-    /// yang SUKSES dan demo terlihat jalan padahal tidak terjadi apa-apa.
+    /// @dev A 1% fee (not 0.3%) so that a handful of swaps produces visible fees.
+    /// Small fees -> getLiquidityForAmounts returns 0 -> INCREASE becomes a
+    /// SUCCEEDING no-op, and the demo looks alive while nothing happened.
     uint24 constant DEMO_FEE = 10_000;
     int24 constant DEMO_TICK_SPACING = 200;
 
@@ -51,14 +51,14 @@ contract SpikeTest is PosmTestSetup {
     }
 
     function test_spike_compoundPathIsTraversable() public {
-        // ── bangkitkan fee: swap bolak-balik terhadap pool sendiri ──────────
+        // ── generate fees: swap back and forth against our own pool ─────────
         _generateFees();
 
         uint128 liqBefore = manager.getPositionLiquidity(key.toId(), _positionKey());
-        assertGt(liqBefore, 0, "posisi harus punya likuiditas");
+        assertGt(liqBefore, 0, "position must hold liquidity");
 
-        // ── LANGKAH 1: panen. Tidak ada aksi "collect" di v4 — decrease(0). ──
-        address harvester = makeAddr("harvester"); // berdiri sebagai Envoyage
+        // ── STEP 1: harvest. v4 has no "collect" action — decrease(0). ───────
+        address harvester = makeAddr("harvester"); // stands in for Envoyage
         uint256 h0Before = IERC20(Currency.unwrap(currency0)).balanceOf(harvester);
         uint256 h1Before = IERC20(Currency.unwrap(currency1)).balanceOf(harvester);
 
@@ -70,14 +70,18 @@ contract SpikeTest is PosmTestSetup {
         uint256 fee0 = IERC20(Currency.unwrap(currency0)).balanceOf(harvester) - h0Before;
         uint256 fee1 = IERC20(Currency.unwrap(currency1)).balanceOf(harvester) - h1Before;
 
-        assertGt(fee0 + fee1, 0, "fee harus mendarat di pihak ketiga");
-        emit log_named_uint("fee0 dipanen", fee0);
-        emit log_named_uint("fee1 dipanen", fee1);
+        assertGt(fee0 + fee1, 0, "fees must land on the third party");
+        emit log_named_uint("fee0 harvested", fee0);
+        emit log_named_uint("fee1 harvested", fee1);
 
-        // likuiditas TIDAK berubah oleh decrease(0) — ini yang membuatnya aman
-        assertEq(manager.getPositionLiquidity(key.toId(), _positionKey()), liqBefore, "decrease(0) tidak mengubah likuiditas");
+        // decrease(0) does NOT change liquidity — that is what makes it safe
+        assertEq(
+            manager.getPositionLiquidity(key.toId(), _positionKey()),
+            liqBefore,
+            "decrease(0) leaves liquidity untouched"
+        );
 
-        // ── LANGKAH 2: hitung delta TANPA swap ──────────────────────────────
+        // ── STEP 2: size the delta WITHOUT a swap ───────────────────────────
         (uint160 sqrtPriceX96,,,) = manager.getSlot0(key.toId());
         uint128 liquidityDelta = LiquidityAmounts.getLiquidityForAmounts(
             sqrtPriceX96,
@@ -87,22 +91,22 @@ contract SpikeTest is PosmTestSetup {
             fee1
         );
 
-        // Gerbang yang mencegah "sukses palsu" di demo.
-        assertGt(liquidityDelta, 0, "ZeroLiquidityDelta: fee terlalu kecil, INCREASE akan jadi no-op yang SUKSES");
+        // The gate that prevents a false success in the demo.
+        assertGt(liquidityDelta, 0, "ZeroLiquidityDelta: fees too small, INCREASE would be a SUCCEEDING no-op");
         emit log_named_uint("liquidityDelta", liquidityDelta);
 
-        // ── LANGKAH 3: tanam kembali. ───────────────────────────────────────
+        // ── STEP 3: reinvest. ───────────────────────────────────────────────
         //
-        // TEMUAN INTI: INCREASE_LIQUIDITY menolak pemanggil yang tidak ter-approve
-        // pada ERC-721 (`NotApproved`). Jadi approval HARUS ada di suatu tempat —
-        // dan inilah justifikasi arsitektur Envoyage: pemilik meng-approve posisi
-        // ke KONTRAK Envoyage, bukan ke keeper. Keeper memicu; Envoyage yang punya
-        // wewenang, dan wewenang itu tidak bisa dipakai untuk apa pun selain aksi
-        // yang disusun Envoyage sendiri.
+        // THE CENTRAL FINDING: INCREASE_LIQUIDITY rejects a caller that is not
+        // ERC-721 approved (`NotApproved`). So the approval MUST live somewhere —
+        // and that is the architectural justification for Envoyage: the owner
+        // approves the position to the Envoyage CONTRACT, not to the keeper. The
+        // keeper triggers; Envoyage holds the authority, and that authority cannot
+        // be spent on anything but the actions Envoyage assembles itself.
         IERC721(address(lpm)).approve(harvester, tokenId);
 
         vm.startPrank(harvester);
-        approvePosm(); // dua langkah: token->Permit2, lalu Permit2->POSM
+        approvePosm(); // two hops: token->Permit2, then Permit2->POSM
         Plan memory p2 = Planner.init();
         p2.add(
             Actions.INCREASE_LIQUIDITY,
@@ -113,12 +117,12 @@ contract SpikeTest is PosmTestSetup {
         vm.stopPrank();
 
         uint128 liqAfter = manager.getPositionLiquidity(key.toId(), _positionKey());
-        assertGt(liqAfter, liqBefore, "likuiditas harus NAIK, tanpa swap sama sekali");
-        emit log_named_uint("likuiditas sebelum", liqBefore);
-        emit log_named_uint("likuiditas sesudah", liqAfter);
+        assertGt(liqAfter, liqBefore, "liquidity must INCREASE, with no swap at all");
+        emit log_named_uint("liquidity before", liqBefore);
+        emit log_named_uint("liquidity after", liqAfter);
     }
 
-    /// @dev bukti negatif: PositionManager menolak aksi swap.
+    /// @dev Negative proof: the PositionManager rejects any swap action.
     function test_spike_positionManagerRejectsSwapAction() public {
         Plan memory p = Planner.init();
         p.add(Actions.SWAP_EXACT_IN_SINGLE, abi.encode(uint256(0)));

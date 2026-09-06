@@ -69,7 +69,7 @@ contract EnvoyageTest is PosmTestSetup {
         uint128 before = manager.getPositionLiquidity(key.toId(), _pk());
         vm.prank(keeper);
         envoyage.compound(mandateId, 0);
-        assertGt(manager.getPositionLiquidity(key.toId(), _pk()), before, "likuiditas naik");
+        assertGt(manager.getPositionLiquidity(key.toId(), _pk()), before, "liquidity increased");
     }
 
     function test_compound_paysCappedFeeToLockedRecipient() public {
@@ -77,8 +77,8 @@ contract EnvoyageTest is PosmTestSetup {
         envoyage.compound(mandateId, 0);
         uint256 got = IERC20(Currency.unwrap(currency0)).balanceOf(feeRecipient);
         assertGt(got, 0, "fee dibayar");
-        // 2% dari fee yang dipanen — bukan 2% dari posisi
-        assertLt(got, 1e18, "fee jauh di bawah nilai posisi");
+        // 2% of harvested fees — not 2% of the position
+        assertLt(got, 1e18, "fee is far below the value of the position");
     }
 
     function test_compound_leavesNoResidualBalance() public {
@@ -91,8 +91,8 @@ contract EnvoyageTest is PosmTestSetup {
     function test_compound_dustGoesToOwnerNotKeeper() public {
         vm.prank(keeper);
         envoyage.compound(mandateId, 0);
-        assertEq(IERC20(Currency.unwrap(currency0)).balanceOf(keeper), 0, "keeper tidak menerima dust");
-        assertEq(IERC20(Currency.unwrap(currency1)).balanceOf(keeper), 0, "keeper tidak menerima dust");
+        assertEq(IERC20(Currency.unwrap(currency0)).balanceOf(keeper), 0, "keeper receives no dust");
+        assertEq(IERC20(Currency.unwrap(currency1)).balanceOf(keeper), 0, "keeper receives no dust");
     }
 
     // ── gerbang ──────────────────────────────────────────────────────────────
@@ -132,9 +132,10 @@ contract EnvoyageTest is PosmTestSetup {
         envoyage.compound(mandateId, 1_000_000e18);
     }
 
-    /// @notice Kelas Code4rena H-04: hak yang menempel pada posisi, bukan pada
-    ///         persetujuan pemilik saat ini. Tanpa `grantor`, penjual mempertahankan
-    ///         hak compound atas posisi pembeli dengan fee ke alamat penjual.
+    /// @notice The Code4rena H-04 class: a right that attaches to the position
+    ///         rather than to the current owner's consent. Without `grantor`, a
+    ///         seller keeps compound rights over the buyer's position, with fees
+    ///         still routed to the seller's address.
     function test_revert_positionSoldToNewOwner() public {
         IERC721(address(lpm)).transferFrom(address(this), buyer, tokenId);
         vm.prank(keeper);
@@ -176,7 +177,7 @@ contract EnvoyageTest is PosmTestSetup {
         m.grantor = attacker; // percobaan pemalsuan
         uint256 id = envoyage.grant(m);
         (, address grantor,,,,,,,) = envoyage.mandates(id);
-        assertEq(grantor, address(this), "grantor dari msg.sender, bukan dari struct");
+        assertEq(grantor, address(this), "grantor comes from msg.sender, never from the struct");
     }
 
     // ── canCompound ──────────────────────────────────────────────────────────

@@ -9,7 +9,7 @@ import {PositionConfig} from "v4-periphery-test/shared/PositionConfig.sol";
 contract HarnessProbe is PosmTestSetup {
     function test_harnessMintsRealPosition() public {
         deployFreshManagerAndRouters();
-        deployMintAndApprove2Currencies();   // WAJIB sebelum deployAndApprovePosm
+        deployMintAndApprove2Currencies(); // WAJIB sebelum deployAndApprovePosm
         deployPosmHookSavesDelta();
         (key,) = initPool(currency0, currency1, IHooks(hook), 3000, SQRT_PRICE_1_1);
         deployAndApprovePosm(manager);
