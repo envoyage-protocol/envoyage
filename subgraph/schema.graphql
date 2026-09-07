@@ -103,3 +103,74 @@ type Protocol @entity(immutable: false) {
   totalFee0ToKeepers: BigInt!
   totalFee1ToKeepers: BigInt!
 }
+
+# ── Permission census ─────────────────────────────────────────────────────
+#
+# Envoyage's argument is that an ERC-721 approval delegates authority without
+# bounding it. These entities turn that argument into a measurement: they index
+# the approvals granted on Uniswap v4's own PositionManager, so the scoped
+# mandates above can be counted against the unscoped grants they replace.
+#
+# No other source can answer this. The v4 subgraphs index liquidity, not
+# delegation; and nothing on chain records the SCOPE of an approval, because an
+# approval has none. Only having both halves in one place makes the comparison
+# possible.
+
+"An address that has been delegated authority over someone's v4 position(s)."
+type Delegate @entity(immutable: false) {
+  "Operator/spender address, lowercase hex"
+  id: ID!
+
+  "Owners who granted this delegate blanket authority over ALL their positions."
+  blanketGrants: Int!
+  "Positions individually approved to this delegate."
+  positionGrants: Int!
+  "Mandates naming this address as keeper — i.e. delegation WITH a scope."
+  scopedGrants: Int!
+
+  firstSeenAt: BigInt!
+  lastSeenAt: BigInt!
+}
+
+"A live ApprovalForAll: one owner handing one operator authority over every position they hold."
+type BlanketApproval @entity(immutable: false) {
+  "owner-operator"
+  id: ID!
+  owner: Bytes!
+  delegate: Delegate!
+  active: Boolean!
+  grantedAt: BigInt!
+  grantedTx: Bytes!
+  revokedAt: BigInt
+}
+
+"A live single-position ERC-721 approval on the v4 PositionManager."
+type PositionApproval @entity(immutable: false) {
+  "tokenId"
+  id: ID!
+  tokenId: BigInt!
+  owner: Bytes!
+  delegate: Delegate!
+  active: Boolean!
+  "True when the approved address is the Envoyage contract, i.e. the approval is scoped."
+  scoped: Boolean!
+  updatedAt: BigInt!
+  updatedTx: Bytes!
+}
+
+"Single row, id = 'census'. The comparison, in numbers."
+type Census @entity(immutable: false) {
+  id: ID!
+
+  "ApprovalForAll grants currently live. Every position the owner holds, unbounded."
+  activeBlanketApprovals: Int!
+  "Single-position approvals currently live, to any address."
+  activePositionApprovals: Int!
+  "Of those, the ones pointing at Envoyage — delegation that carries a scope."
+  activeScopedApprovals: Int!
+  "Single-position approvals to something other than Envoyage."
+  activeUnscopedApprovals: Int!
+
+  distinctDelegates: Int!
+  totalApprovalEvents: Int!
+}
