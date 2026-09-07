@@ -94,7 +94,56 @@ ditegakkan role bitmap. Dua substrat, satu gagasan.
 
 Sumber: `docs.ens.domains/learn/deployments`. **Diverifikasi, bukan disalin.**
 
-## Signature yang dipakai
+## ⚠️ KOREKSI 7 Sept — signature di bawah SALAH, dibaca dari ABI on-chain
+
+Blok "Signature yang dipakai" berikutnya ditulis dari tutorial dan **tidak cocok
+dengan kontrak yang benar-benar ter-deploy**. Dikoreksi dari ABI terverifikasi
+Etherscan `0xa88553f4…a2cc`:
+
+```solidity
+// YANG SEBENARNYA ADA — 8 parameter, bukan 6
+function register(string,address,bytes32,address,address,uint64,address,bytes32)
+    returns (uint256);
+
+// dan ada alur commit-reveal yang tidak disebut rencana sama sekali
+function makeCommitment(string,address,bytes32,address,address,uint64,bytes32) pure returns (bytes32);
+function commit(bytes32);
+MIN_COMMITMENT_AGE   = 60s
+MAX_COMMITMENT_AGE   = 86400s
+MIN_REGISTER_DURATION = 2419200s (28 hari)
+
+function isAvailable(string) view returns (bool);       // bukan available()
+function getRegisterPrice(string,uint64,address) view returns (uint256,uint256);
+```
+
+**Temuan yang lebih penting: registrasi dibayar dengan ERC-20, bukan ETH native.**
+Argumen `address` ketiga adalah payment token. Memberi EOA atau `address(0)`
+membalikkan `PaymentTokenNotSupported(address)` = `0x02e2ae9e`.
+
+Token yang diterima oracle (`0x8914b662…8987`):
+
+| Token | Alamat | Diterima |
+|---|---|---|
+| USDC (6 desimal) | `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238` | ✅ |
+| native / WETH Sepolia | — | ❌ |
+
+Harga `envoyage`, terbaca on-chain:
+
+| Durasi | Harga |
+|---|---|
+| 1 tahun | 8.000021 USDC |
+| 28 hari (minimum) | 0.613701 USDC |
+
+`isAvailable("envoyage")` = **true**. Saldo USDC deployer = **0** →
+**blocker: butuh USDC testnet Sepolia**, bukan ETH. Faucet: `faucet.circle.com`.
+
+Ini persis risiko yang rencana ini sendiri catat: *"Signature role EAC per-record
+belum jelas — verifikasi dari ABI on-chain, jangan tebak."* Yang keliru ternyata
+bukan hanya bagian EAC, tapi `register` itu sendiri.
+
+---
+
+## Signature yang dipakai — ⚠️ USANG, lihat koreksi di atas
 
 ```solidity
 // registrar -> registry
