@@ -1,11 +1,13 @@
 import {useEffect, useState} from "react";
 import {formatUnits, type Hex} from "viem";
-import {ENVOYAGE, EXPLORER, DEMO_MANDATE_ID} from "./lib/config";
+import {ENVOYAGE, EXPLORER, DEMO_MANDATE_ID, ENS_PARENT, KEEPER_KEY} from "./lib/config";
+import {fetchEnvoyage, fetchUniswapScale, type Census, type UniswapScale, type MandateRow} from "./lib/graph";
 import {
   readMandate,
   readCanCompound,
   readPositionOwner,
   readExecutions,
+  readEnsScope,
   REFUSAL_REASONS,
   type Mandate,
   type Execution
@@ -25,6 +27,14 @@ export function App() {
   const [execs, setExecs] = useState<Execution[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  const [census, setCensus] = useState<Census | null>(null);
+  const [indexedBlock, setIndexedBlock] = useState<number | null>(null);
+  const [rows, setRows] = useState<MandateRow[]>([]);
+
+  const [scale, setScale] = useState<UniswapScale | null>(null);
+  const [ens, setEns] = useState<{node: string; records: Record<string, string>} | null>(null);
+  const [graphError, setGraphError] = useState<string | null>(null);
+
   useEffect(() => {
     (async () => {
       try {
@@ -38,12 +48,28 @@ export function App() {
         setReason(r);
         setPos(p);
         setExecs(e);
+
+        // ENS is read through the resolver, not reused from the values above, so what
+        // is shown here is what a stranger's ENS client would get.
+        readEnsScope(m.tokenId).then(setEns).catch(() => {});
       } catch (err) {
         // Surfaced rather than swallowed. An empty page that silently failed to read
         // the chain looks identical to a page with nothing to show.
         setError(err instanceof Error ? err.message : String(err));
       }
     })();
+
+    // The two Graph sources load independently of the chain reads, so a slow or
+    // failing indexer never blanks the parts that come straight from Sepolia.
+    fetchEnvoyage()
+      .then((d) => {
+        setCensus(d.census);
+        setRows(d.mandates);
+        setIndexedBlock(d.indexedBlock);
+      })
+      .catch((e) => setGraphError(e instanceof Error ? e.message : String(e)));
+
+    fetchUniswapScale().then(setScale).catch(() => {});
   }, []);
 
   const revoked = mandate !== null && mandate.keeper === "0x0000000000000000000000000000000000000000";
@@ -60,6 +86,58 @@ export function App() {
           Sepolia · {link(`address/${ENVOYAGE}#code`, ENVOYAGE)} · verified
         </p>
       </header>
+
+      <section className="panel">
+        <h2>The exposure, counted</h2>
+        {!census && !graphError && <p className="muted">Reading the subgraph…</p>}
+        {graphError && <p className="err small mono">subgraph: {graphError}</p>}
+        {census && (
+          <>
+            <div className="grid2">
+              <div className="cmp danger">
+                <p className="sub" style={{marginBottom: 6}}>Unbounded delegation, live on Uniswap v4</p>
+                <p className="big" style={{margin: 0}}>
+                  {census.activeBlanketApprovals + census.activeUnscopedApprovals}
+                </p>
+                <ul style={{marginTop: 10}}>
+                  <li>
+                    <strong>{census.activeBlanketApprovals}</strong> <code>setApprovalForAll</code> —
+                    every position the owner holds, now and in future
+                  </li>
+                  <li>
+                    <strong>{census.activeUnscopedApprovals}</strong> single-position approvals
+                    with no scope attached
+                  </li>
+                  <li>
+                    across <strong>{census.distinctDelegates}</strong> distinct delegate addresses
+                  </li>
+                </ul>
+              </div>
+              <div className="cmp safe">
+                <p className="sub" style={{marginBottom: 6}}>Delegation that carries a scope</p>
+                <p className="big" style={{margin: 0}}>{census.activeScopedApprovals}</p>
+                <ul style={{marginTop: 10}}>
+                  <li>Approvals pointing at Envoyage, where the recipient is fixed in code</li>
+                  <li>Fee capped in bps of harvested fees, never of the position</li>
+                  <li>Dies the moment the position changes hands</li>
+                </ul>
+              </div>
+            </div>
+            <p className="small muted" style={{marginBottom: 0}}>
+              Counted from every <code>Approval</code> and <code>ApprovalForAll</code> emitted by
+              Uniswap v4&rsquo;s PositionManager on Sepolia
+              {indexedBlock && <> · indexed to block {indexedBlock.toLocaleString()}</>}
+              {scale && (
+                <>
+                  {" "}· for scale, v4 on mainnet holds{" "}
+                  <strong>{Number(scale.pools).toLocaleString()}</strong> pools across{" "}
+                  <strong>{Number(scale.txCount).toLocaleString()}</strong> transactions
+                </>
+              )}
+            </p>
+          </>
+        )}
+      </section>
 
       {error && (
         <div className="panel">
@@ -205,8 +283,52 @@ export function App() {
       </section>
 
       <section className="panel">
+        <h2>Readable without us — {mandate ? `${mandate.tokenId}.${ENS_PARENT}` : ENS_PARENT}</h2>
+        <p className="small muted" style={{marginTop: -6}}>
+          Resolved through the ENSv2 resolver, not copied from the values above. Anyone can
+          read this in any ENS client without visiting this page or trusting it.
+        </p>
+        {!ens && <p className="muted">Resolving…</p>}
+        {ens && (
+          <div className="grid2">
+            <table>
+              <tbody>
+                {Object.entries(ens.records)
+                  .filter(([k]) => k !== KEEPER_KEY)
+                  .map(([k, v]) => (
+                    <tr key={k}>
+                      <td className="mono">{k}</td>
+                      <td className="mono">{v || <span className="muted">—</span>}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+            <div className="cmp">
+              <h3 style={{fontSize: 13, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".06em"}}>
+                The one key the keeper may write
+              </h3>
+              <p className="mono" style={{margin: "8px 0 4px"}}>
+                {KEEPER_KEY} = {ens.records[KEEPER_KEY] || "—"}
+              </p>
+              <p className="small muted" style={{marginBottom: 0}}>
+                The bot writes this itself after each run. The identical call aimed at{" "}
+                <code>envoyage:maxFeeBps</code> reverts <code>EACUnauthorizedAccountRoles</code> —
+                so it can report what it did, and cannot rewrite what it is allowed to do.
+              </p>
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="panel">
         <h2>What the keeper actually did</h2>
         {execs.length === 0 && <p className="muted">No executions indexed yet.</p>}
+        {rows.length > 0 && (
+          <p className="small muted" style={{marginTop: -6}}>
+            {rows[0].executionCount} execution{rows[0].executionCount === 1 ? "" : "s"} indexed ·
+            fee cap {(rows[0].maxFeeBps / 100).toFixed(2)}% · cooldown {rows[0].minInterval}s
+          </p>
+        )}
         {execs.length > 0 && (
           <>
             <p className="big">
@@ -245,8 +367,36 @@ export function App() {
         )}
       </section>
 
+      <section className="panel">
+        <h2>Where this page gets its numbers</h2>
+        <div className="grid2">
+          <div className="cmp">
+            <h3>Envoyage subgraph · Subgraph Studio</h3>
+            <p className="sub">Mandate scope, execution history, and the approval census</p>
+            <p className="small muted" style={{marginBottom: 0}}>
+              Also the keeper&rsquo;s work list: the bot asks this subgraph which mandates name
+              it and which has gone longest without service. Remove it and the bot has nothing
+              to do.
+            </p>
+          </div>
+          <div className="cmp">
+            <h3>Uniswap v4 subgraph · decentralized network</h3>
+            <p className="sub">The size of the population the problem applies to</p>
+            <p className="small muted" style={{marginBottom: 0}}>
+              Uniswap&rsquo;s subgraph knows how many positions exist and who holds them, and has
+              no concept of a permission scope — an approval carries none. Ours knows exactly
+              what each keeper may do. Neither answers the question alone.
+            </p>
+          </div>
+        </div>
+        <p className="small muted" style={{marginBottom: 0}}>
+          Contract state and refusal reasons still come straight from Sepolia over two
+          independent RPC operators, so the page renders even if an indexer is behind.
+        </p>
+      </section>
+
       <footer>
-        Read directly from Sepolia over two independent RPC operators — no indexer, no backend.
+        Composed from two Graph products plus direct chain reads. No backend.
         <br />
         <a href="https://github.com/envoyage-protocol/envoyage">github.com/envoyage-protocol/envoyage</a>
       </footer>

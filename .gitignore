@@ -30,3 +30,4 @@ subgraph/generated/
 web/node_modules/
 web/dist/
 keeper/node_modules/
+web/.env.local
