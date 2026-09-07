@@ -28,14 +28,18 @@ Hire a Uniswap v4 keeper without handing it your position. Scoped permission, no
 
 **Is there anything blocking you?**
 ```
-One thing, and it's small: I need a Subgraph Studio deploy key. The subgraph is
-written and its handlers pass 5 matchstick tests, and the build is on IPFS at
-QmNsAEPDBLY1TedpzxDUt1Rau4gxKbLjWQknTNWTpHBQHS, but every key I have is rejected
-with "Deploy key not found" — they're Substreams/registry keys, not Studio deploy
-keys. If a Graph mentor can point me at the right place to generate one, that
-unblocks it in minutes.
+Nothing is blocked. Contract, ENS names, subgraph and the keeper bot are all live
+on Sepolia and working end-to-end.
 
-Nothing else is blocked. Contracts, ENS and the keeper bot are all live on Sepolia.
+One question I'd value a Graph mentor's read on: which track my subgraph best fits.
+It indexes the granted permission scope alongside the keeper's actual behaviour on
+the same entity, which I think is closer to the standardized-schema angle than to
+"querying one subgraph" — but I'd rather be told than guess, since a wrong pick
+wastes the slot.
+
+A note in case it saves someone else time: deploying against a slug that doesn't
+exist yet fails with "Deploy key not found", which reads like a credentials problem
+and isn't one. Cost me a while before I realised the key was fine all along.
 ```
 
 **How confident do you feel about submitting?**
@@ -80,20 +84,34 @@ minFee) — two integers. Envoyage assembles the v4 action array itself with the
 recipient as a constant in code. Misuse isn't rejected by a check; there's no
 field to express it in.
 
-Already live on Sepolia: contract 0x8466e82E02edF3F00c0387D5C3E66d407dc7259C
-(verified), and a reference keeper bot that compounded a position it doesn't own,
-unattended, in block 11644861 — 100.000000 to 100.614338 liquidity, with Envoyage
-holding 0 of both tokens afterwards.
+All five pieces are live on Sepolia, not planned:
 
-Each mandate is also an ENSv2 subname. 38896.envoyage.eth resolves its scope in
-any ENS client, so it can be read without trusting my frontend. The keeper holds
-authorizeTextRoles on exactly one key: writing envoyage:lastRun succeeds, writing
-envoyage:maxFeeBps reverts EACUnauthorizedAccountRoles.
+- Contract 0x8466e82E02edF3F00c0387D5C3E66d407dc7259C, verified on Etherscan
+- A reference keeper bot that compounded a position it does not own, unattended,
+  in block 11644861 — and again in 11644474. Envoyage held 0 of both tokens after
+  each, so "non-custodial between transactions" is an on-chain fact rather than an
+  intention.
+- ENSv2: 38896.envoyage.eth resolves the mandate's full scope in any ENS client, so
+  it can be read without trusting my frontend. The keeper holds authorizeTextRoles
+  on exactly one key — writing envoyage:lastRun succeeds, writing
+  envoyage:maxFeeBps reverts EACUnauthorizedAccountRoles. Same division the
+  contract's gate enforces, on a different substrate.
+- Subgraph live at api.studio.thegraph.com/query/62788/envoyage/v0.0.2, indexing
+  the granted scope beside actual behaviour on one entity.
+- A web UI reading live state directly over two independent RPC operators.
+
+38 Solidity tests plus 5 subgraph tests, forge lint clean. The exploit replay is
+paired: each attack runs against a comparator built vulnerable exactly as Revert
+V3Utils was, AND against Envoyage — because showing we merely lack the vulnerable
+function is a tautology. The same H-04 back-run steals 4.757902903361556095 token0
+from the comparator and cannot be encoded against us.
 ```
 
 **Prizes you're going for:** Uniswap · ENS · The Graph
 
 **Technologies already built on:** Uniswap · ENS · The Graph
+
+All three are integrated and live, not planned — see the links above.
 
 **Technologies interested in learning more about:** The Graph (Substreams) · ENS
 

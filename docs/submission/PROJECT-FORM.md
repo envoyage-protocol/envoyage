@@ -41,8 +41,11 @@ A mandate carries what an approval cannot: a fee cap in basis points of harveste
 (never of the position), a fee recipient pinned at grant time, a cooldown, an expiry,
 and a check that the position has not changed hands. Revocation is immediate.
 
-Each mandate is also published as an ENSv2 subname, so anyone can resolve it in any ENS
-client and read the exact scope — without visiting our app or trusting our frontend.
+Each mandate is also published as an ENSv2 subname. 38896.envoyage.eth resolves the
+full scope in any ENS client, so it can be read without visiting our app or trusting
+our frontend. And the keeper's limits hold there too: it is granted write access to
+exactly one text key, so recording its last run succeeds while rewriting its own fee
+cap reverts.
 ```
 
 ---
@@ -99,12 +102,29 @@ that mattered: findTokenId is NOT keccak256(label) — the registry masks the lo
 for versioning, so a locally computed id addresses a name nobody resolves through, and
 it fails silently rather than reverting.
 
-Also shipped: a subgraph indexing the granted scope alongside actual behaviour (most
-tooling can only index what a keeper did, because what it was allowed to do doesn't
-exist on chain), a reference keeper bot verified compounding unattended on Sepolia, and
-a web UI reading live state over two independent RPC operators with no backend or
-indexer — two operators rather than several keys from one provider, because keys from a
-single provider share a failure domain and the fallback never actually fails over.
+The subgraph indexes the granted scope alongside actual behaviour on the same entity,
+which most keeper tooling cannot do: what a bot was ALLOWED to do does not exist on
+chain, because an ERC-721 approval carries no scope. One query returns maxFeeBps 200,
+minInterval 60 and expiry beside executionCount 2 and totalLiquidityAdded
+1225570246268614335. Two mapping decisions came from reading the generated types
+rather than assuming: the scope is read with try_mandates() at grant block since no
+event carries it, and handleMandateRevoked deliberately does not re-read storage,
+because revoke() deletes the struct and the record of what a keeper was permitted to
+do must survive the moment it stops being permitted.
+
+Also shipped: a reference keeper bot verified compounding unattended on Sepolia, and a
+web UI reading live state over two independent RPC operators with no backend or
+indexer — two operators rather than several keys from one provider, because keys from
+a single provider share a failure domain and the fallback never actually fails over.
+
+Things that only surfaced by driving the real contracts rather than the tutorials:
+ENS findTokenId is not keccak256(label) — the registry masks the low 32 bits for
+versioning, so a locally computed id addresses a name nobody resolves through and
+setSubregistry against it fails silently rather than reverting. type(uint256).max is
+not a valid EAC role bitmap, because roles are packed into nybbles and only every
+fourth bit names one. grantRoles(0, ...) reverts EACRootResourceNotAllowed since id 0
+is the root resource. And the shared resolver cannot be written to at all — you must
+deploy your own proxy, which the error EACCannotGrantRoles(..., 16, ...) does not say.
 ```
 
 ---
@@ -118,6 +138,18 @@ https://sepolia.etherscan.io/address/0x8466e82E02edF3F00c0387D5C3E66d407dc7259C#
 ```
 
 Replace with the demo video URL before final submission.
+
+## Live links to cite
+
+| | |
+|---|---|
+| Envoyage (verified) | `https://sepolia.etherscan.io/address/0x8466e82E02edF3F00c0387D5C3E66d407dc7259C#code` |
+| Subgraph | `https://api.studio.thegraph.com/query/62788/envoyage/v0.0.2` |
+| ENS parent | `envoyage.eth` (ENSv2 Sepolia beta) |
+| ENS mandate name | `38896.envoyage.eth` |
+| EnvoyageNames | `0x307CF6B0022Ef757820A8C3Cfced97C324eE0d05` |
+| ENS registry | `0x6CD593BE2B0fF155120b49042Cf57089625189F6` |
+| ENS resolver | `0xAF5b8aCF804e59fb823C05D37e73D523Af2Eca8a` |
 
 ---
 
