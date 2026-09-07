@@ -18,6 +18,21 @@ forge test                                   # confirm 38 green
 cd web && npm run dev                        # leave running on :5173
 ```
 
+Set these in the recording terminal — the ENS beats need them and looking them up
+mid-take is how a good take gets ruined:
+
+```bash
+set -a; . ./.env; set +a
+export RESOLVER=$(python3 -c "import json;print(json.load(open('deployments/ens-sepolia.json'))['resolver'])")
+export NAMES=$(python3 -c "import json;print(json.load(open('deployments/ens-sepolia.json'))['envoyageNames'])")
+export NODE=$(cast call $NAMES 'nodeFor(uint256)(bytes32)' 38896 --rpc-url $SEPOLIA_RPC_URL)
+export ENVOYAGE=0x8466e82E02edF3F00c0387D5C3E66d407dc7259C
+```
+
+Both ENS beats were verified against live Sepolia before this script was written:
+writing `envoyage:lastRun` as the keeper returns `0x`, writing `envoyage:maxFeeBps`
+returns `0x4b27a133` — `EACUnauthorizedAccountRoles`.
+
 Have open: the app, and [`sepolia.etherscan.io/address/0x8466e82E02edF3F00c0387D5C3E66d407dc7259C#code`](https://sepolia.etherscan.io/address/0x8466e82E02edF3F00c0387D5C3E66d407dc7259C#code).
 
 ---
