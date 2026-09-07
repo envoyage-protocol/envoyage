@@ -31,7 +31,7 @@ Hire a Uniswap v4 keeper without handing it your position. Scoped permission, no
 **Technologies already built on:** Uniswap · ENS · The Graph
 
 **How confident do you feel about submitting?**
-Confident — it's deployed and working on Sepolia. What's left is the UI and the video.
+Confident — deployed, working, and the UI is wired up. What's left is the video.
 
 ---
 
@@ -48,20 +48,26 @@ carries a fee cap, a cooldown, an expiry, and dies if the position is sold.
 
 Live on Sepolia: the contract, a keeper bot that compounds unattended, an ENSv2
 subname per mandate so anyone can read its scope in any ENS client, and a subgraph
-that decides what the bot works on.
+that both decides what the bot works on and counts the problem — it indexes every
+approval ever granted on Uniswap v4's PositionManager, so "unbounded approvals are
+the norm" stops being a claim and becomes a number.
 ```
 
 **Is there anything blocking you?**
 ```
-Nothing external — it's all deployed and working.
+Nothing is blocking me. Everything is deployed and working on Sepolia, and the UI
+now reads both my subgraph and the ENS records rather than only the chain.
 
-The honest gap is my web UI: it reads the chain directly and shows neither the
-subgraph nor the ENS name, so two of my three integrations are invisible on screen.
-That's my next block of work.
+What's left is the demo video, which is just work rather than a problem.
 
-One question for a Graph mentor: my subgraph is load-bearing for automation — it
-decides which mandates the bot serves and in what order — but it's a single product,
-so I don't think it counts as "composable". Which track should I be aiming at?
+One question I'd still value a Graph mentor's read on: which track to aim at. My
+subgraph is load-bearing for automation — it decides which mandates the keeper
+serves and in what order — which sounds like the AI track. But the UI also composes
+it with Uniswap's own v4 subgraph through the Gateway, because neither answers the
+question alone: Uniswap's knows how many positions exist and has no notion of a
+permission scope, mine knows exactly what each keeper may do. That sounds like the
+Composable track. I'd rather be told which is the stronger fit than split the
+difference and be weak at both.
 ```
 
 **Anything else you think we should know?**
