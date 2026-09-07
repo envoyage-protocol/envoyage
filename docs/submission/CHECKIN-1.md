@@ -1,76 +1,108 @@
-# Check-in #1 — draft
+# Check-in #1 — field by field
 
 Due Mon 7 Sep 23:59 ET = **Tue 8 Sep 10:59 WIB**
 
-Submit in TWO places: the Hacker Dashboard, and the Discord
-`#project-check-ins` channel. At least one check-in is mandatory for the stake
-to be returned.
+---
+
+**Project name:** `Envoyage`
+**Category:** `Security`
+**Emoji:** 🔐
+
+**GitHub repository** (replace the placeholder):
+```
+https://github.com/envoyage-protocol/envoyage
+```
+
+**Short description** — 99 chars:
+```
+Hire a Uniswap v4 keeper without handing it your position. Scoped permission, not blanket approval.
+```
 
 ---
 
-**Project:** Envoyage — scoped keeper permissions for Uniswap v4
-**Repo:** https://github.com/envoyage-protocol/envoyage
-**Track:** Start Fresh · Sepolia
+## Your Plan
 
-## What it does
+**Solo or team:** Hacking Solo
 
-Today, hiring a keeper to compound a Uniswap v4 position means `approve(keeper, tokenId)`.
-That constrains *which* position, never *what may be done to it* — and four of v4's 26
-actions (`TAKE_PAIR`, `TAKE`, `SWEEP`, `MINT_POSITION`) take a recipient straight from
-the caller. So an approved keeper can assemble `DECREASE_LIQUIDITY` +
-`TAKE_PAIR(…, its own wallet)` and nothing on chain objects. That is the Code4rena
-Revert Lend H-04 class and the shape behind the ~$17M Aperture Finance drain.
+**Skills:** Smart contracts / Solidity · Backend · Frontend · Security
 
-Envoyage inverts it. The keeper never writes v4 instructions — it calls
-`compound(mandateId, minFee)`, two integers. Envoyage assembles the action array itself
-with the recipient as a constant in code. Misuse isn't rejected by a check; there's no
+**Is there anything blocking you?**
+```
+One thing, and it's small: I need a Subgraph Studio deploy key. The subgraph is
+written and its handlers pass 5 matchstick tests, and the build is on IPFS at
+QmNsAEPDBLY1TedpzxDUt1Rau4gxKbLjWQknTNWTpHBQHS, but every key I have is rejected
+with "Deploy key not found" — they're Substreams/registry keys, not Studio deploy
+keys. If a Graph mentor can point me at the right place to generate one, that
+unblocks it in minutes.
+
+Nothing else is blocked. Contracts, ENS and the keeper bot are all live on Sepolia.
+```
+
+**How confident do you feel about submitting?**
+Very confident — the core is deployed, verified and working end-to-end.
+
+**Anything else you think we should know?**
+```
+Two things, both for transparency.
+
+Five commits predate the 4 Sep opening. All five are toolchain scaffolding and
+planning docs — no protocol code. The first line of Envoyage logic is commit
+fb42859 on 5 Sep, after the event opened. Entering on Start Fresh.
+
+AI usage is documented in AI-USAGE.md, including five things AI got wrong in this
+repo and how each was caught — e.g. the keeper bot could never have sent a
+transaction because viem was handed an address instead of an account object, which
+surfaced only by running it against Sepolia.
+```
+
+---
+
+## Your Idea
+
+**Have you decided on an idea:** Yes
+
+**What are you thinking of building?**
+```
+To let a bot compound your Uniswap v4 position today you call approve(keeper,
+tokenId). That says WHICH position it may touch, never WHAT it may do.
+
+v4 sharpens this: liquidity management goes through one entrypoint,
+modifyLiquidities(bytes actions), and that payload is an action array — a small
+language of 26 opcodes. "May only call modifyLiquidities" restricts nothing,
+because that function is itself an interpreter. I traced all 26 to file and line:
+four (TAKE_PAIR, TAKE, SWEEP, MINT_POSITION) take a recipient straight from the
+caller. So an approved keeper can assemble DECREASE_LIQUIDITY + TAKE_PAIR(...,
+its own wallet) and nothing on chain objects — the Code4rena Revert Lend H-04
+class, and the shape behind the ~$17M Aperture Finance drain.
+
+Envoyage inverts who writes the instructions. The keeper calls compound(mandateId,
+minFee) — two integers. Envoyage assembles the v4 action array itself with the
+recipient as a constant in code. Misuse isn't rejected by a check; there's no
 field to express it in.
 
-## Progress so far
+Already live on Sepolia: contract 0x8466e82E02edF3F00c0387D5C3E66d407dc7259C
+(verified), and a reference keeper bot that compounded a position it doesn't own,
+unattended, in block 11644861 — 100.000000 to 100.614338 liquidity, with Envoyage
+holding 0 of both tokens afterwards.
 
-Live and verified on Sepolia:
-
-- **Envoyage** `0x8466e82E02edF3F00c0387D5C3E66d407dc7259C` (verified)
-- Position `#38896`, ERC-721 approved to Envoyage — never to the keeper
-- Mandate `#1`, capped at 200 bps of harvested fees, 60s cooldown
-
-The reference keeper bot compounded it unattended, block 11644861:
-
-```
-liquidity before  100.000000000000000000
-liquidity after   100.614338692357009962
+Each mandate is also an ENSv2 subname. 38896.envoyage.eth resolves its scope in
+any ENS client, so it can be read without trusting my frontend. The keeper holds
+authorizeTextRoles on exactly one key: writing envoyage:lastRun succeeds, writing
+envoyage:maxFeeBps reverts EACUnauthorizedAccountRoles.
 ```
 
-Verified by independent on-chain reads rather than the script's own output: the emitted
-fees match the keeper's balances exactly, and Envoyage holds 0 of both tokens — so
-"non-custodial between transactions" is an on-chain fact, not a design intention.
+**Prizes you're going for:** Uniswap · ENS · The Graph
 
-**38 tests, `forge lint` clean.** The exploit replay is deliberately paired: each attack
-runs against `NaiveUtils`, a comparator built vulnerable in exactly the way Revert
-V3Utils was, *and* against Envoyage. A test showing we merely lack the vulnerable
-function is a tautology; showing the same attack drain the contract next to it is not.
+**Technologies already built on:** Uniswap · ENS · The Graph
 
-```
-H-04 vs NaiveUtils -- token0 stolen: 4.757902903361556095
-keeper received (capped at 2%):      0.0012
-```
+**Technologies interested in learning more about:** The Graph (Substreams) · ENS
 
-Also shipped: 4 deploy scripts (rehearsed on an anvil fork before broadcasting), a
-subgraph with 5 matchstick tests, a web UI reading live state with no backend, and
-`docs/V4-ACTION-COMPLETENESS.md` tracing all 26 v4 actions to file and line.
+---
 
-## Next
+## Where to submit
 
-- Deploy the subgraph to Studio (built and tested; blocked on a deploy key)
-- ENSv2: a mandate becomes a subname, so its scope resolves in any ENS client rather
-  than only in our UI
-- Demo video
+Both places:
+1. Hacker Dashboard
+2. Discord `#project-check-ins`
 
-## Blockers
-
-**The Graph Studio deploy key.** The subgraph builds and its handlers are tested, but
-it has nowhere to run yet.
-
-**Sepolia test USDC for ENSv2.** Registration on the ENSv2 Sepolia beta is priced in
-USDC (`0x1c7D…7238`), not native ETH — 8.00 USDC for a year, 0.61 for the 28-day
-minimum. Our wallet holds ETH but no USDC.
+At least one check-in is mandatory for the stake to be returned.
