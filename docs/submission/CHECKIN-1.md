@@ -55,19 +55,26 @@ the norm" stops being a claim and becomes a number.
 
 **Is there anything blocking you?**
 ```
-Nothing is blocking me. Everything is deployed and working on Sepolia, and the UI
-now reads both my subgraph and the ENS records rather than only the chain.
+Nothing is blocking the build — everything is deployed and working on Sepolia, and
+the UI now reads my subgraph and the ENS records rather than only the chain. Three
+things I'd genuinely value help with:
 
-What's left is the demo video, which is just work rather than a problem.
+1. Which Graph track should I aim at? My subgraph is load-bearing for automation —
+   it decides which mandates the keeper serves and in what order — which sounds like
+   the AI track. But the UI also composes it with Uniswap's own v4 subgraph through
+   the Gateway, because neither answers the question alone: Uniswap's knows how many
+   positions exist and has no notion of a permission scope, mine knows exactly what
+   each keeper may do. That sounds like Composable. I'd rather be told which is the
+   stronger fit than split the difference and be weak at both.
 
-One question I'd still value a Graph mentor's read on: which track to aim at. My
-subgraph is load-bearing for automation — it decides which mandates the keeper
-serves and in what order — which sounds like the AI track. But the UI also composes
-it with Uniswap's own v4 subgraph through the Gateway, because neither answers the
-question alone: Uniswap's knows how many positions exist and has no notion of a
-permission scope, mine knows exactly what each keeper may do. That sounds like the
-Composable track. I'd rather be told which is the stronger fit than split the
-difference and be weak at both.
+2. Is the Uniswap prize worth one of my three partner slots? I'm net-new, so I read
+   the Continuity track as closed to me, which leaves the smaller one. ENS and The
+   Graph are clearly worth a slot each; I'm unsure the third is best spent there.
+
+3. Judging Round 2 is live, and I'm solo in Indonesia (UTC+7). Depending on the hour
+   it lands somewhere between 8pm and 1am for me. If there's any flexibility on slot
+   times, I'd appreciate knowing early so I can plan around it rather than discover
+   it on the day.
 ```
 
 **Anything else you think we should know?**
