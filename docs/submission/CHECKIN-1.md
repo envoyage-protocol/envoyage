@@ -28,22 +28,35 @@ Hire a Uniswap v4 keeper without handing it your position. Scoped permission, no
 
 **Is there anything blocking you?**
 ```
-Nothing is blocked. Contract, ENS names, subgraph and the keeper bot are all live
-on Sepolia and working end-to-end.
+Not blocked on anything external — contract, ENS names, subgraph and keeper bot are
+all live on Sepolia. The real gap is that they are three integrations that don't yet
+talk to each other, and I'd rather name that than claim everything is fine:
+
+- the web UI reads the chain directly and never queries my own subgraph
+- it doesn't display the ENS name either, so the ENS work currently only shows up in
+  script output
+- the keeper doesn't write its envoyage:lastRun record after compounding; I set that
+  key by hand to prove the permission works
+
+Each piece is real, but "functional demo, not hard-coded values" is a fair thing to
+hold me to, and right now one of those records genuinely was set by hand. Wiring
+them together is my next block of work, ahead of any new features.
 
 One question I'd value a Graph mentor's read on: which track my subgraph best fits.
 It indexes the granted permission scope alongside the keeper's actual behaviour on
-the same entity, which I think is closer to the standardized-schema angle than to
+the same entity, which feels closer to the standardized-schema angle than to
 "querying one subgraph" — but I'd rather be told than guess, since a wrong pick
-wastes the slot.
+wastes one of three prize slots.
 
-A note in case it saves someone else time: deploying against a slug that doesn't
+A note in case it saves someone time: deploying against a Studio slug that doesn't
 exist yet fails with "Deploy key not found", which reads like a credentials problem
-and isn't one. Cost me a while before I realised the key was fine all along.
+and isn't one.
 ```
 
 **How confident do you feel about submitting?**
-Very confident — the core is deployed, verified and working end-to-end.
+Confident — the core is deployed, verified and working end-to-end. The remaining
+work is wiring the three integrations to each other, which is well understood
+rather than risky.
 
 **Anything else you think we should know?**
 ```

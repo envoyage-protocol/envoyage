@@ -6,6 +6,12 @@ export const MANDATES = parseAbiItem(
 export const CAN_COMPOUND = parseAbiItem("function canCompound(uint256) view returns (bytes4)");
 export const COMPOUND = parseAbiItem("function compound(uint256 mandateId, uint256 minFee)");
 export const NEXT_MANDATE_ID = parseAbiItem("function nextMandateId() view returns (uint256)");
+/// ENS side. The keeper holds ROLE_SET_TEXT on exactly ONE key, so this is the only
+/// resolver call it can make — writing any other key reverts EACUnauthorizedAccountRoles.
+export const SET_TEXT = parseAbiItem("function setText(bytes32 node, string key, string value)");
+export const NODE_FOR = parseAbiItem("function nodeFor(uint256 positionId) view returns (bytes32)");
+export const KEEPER_KEY = "envoyage:lastRun";
+
 export const MANDATE_GRANTED = parseAbiItem(
   "event MandateGranted(uint256 indexed id, address indexed keeper, uint256 indexed tokenId)"
 );
