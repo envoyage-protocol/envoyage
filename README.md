@@ -122,7 +122,25 @@ For reviewers verifying the v4 integration — the specific contracts and lines:
 | Proof `INCREASE_LIQUIDITY` needs ERC-721 approval | [`test/unit/Spike.t.sol:106`](test/unit/Spike.t.sol#L106) |
 | All 26 v4 actions traced to file and line | [`docs/V4-ACTION-COMPLETENESS.md`](docs/V4-ACTION-COMPLETENESS.md) |
 
-Feedback for the Uniswap team is in [`FEEDBACK.md`](FEEDBACK.md).
+Feedback for the Uniswap team is in [`FEEDBACK.md`](FEEDBACK.md), and
+[`SKILL.md`](SKILL.md) explains how The Graph is load-bearing rather than decorative.
+
+## The problem, counted
+
+Envoyage's argument used to be rhetorical. The subgraph indexes every `Approval` and
+`ApprovalForAll` ever emitted by Uniswap v4's own `PositionManager` on Sepolia, so it
+is now arithmetic:
+
+| | |
+|---|---|
+| `setApprovalForAll` grants live — every position the owner holds, unbounded | **133** |
+| single-position approvals carrying no scope | **283** |
+| approvals that carry a scope | **1** |
+| distinct delegate addresses | **270** |
+
+**416 live unbounded delegations against 1 scoped one.** The 722 approval events
+behind those figures match an independent Etherscan log count exactly, so the census
+is complete rather than merely plausible.
 
 ## Components
 
