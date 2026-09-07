@@ -5,7 +5,7 @@
   "scripts": {
     "codegen": "graph codegen",
     "build": "graph build",
-    "deploy": "graph deploy envoyage --node https://api.studio.thegraph.com/deploy/",
+    "deploy": "graph deploy ethonline --node https://api.studio.thegraph.com/deploy/",
     "test": "graph test"
   },
   "dependencies": {
