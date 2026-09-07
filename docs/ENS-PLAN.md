@@ -191,3 +191,111 @@ Langkah 8 adalah buktinya. Kalau scope hanya terbaca di aplikasi kami, klaim
 | Signature role EAC per-record belum jelas | Tutorial tidak memuatnya. **Verifikasi dari ABI on-chain**, jangan tebak |
 | Registrasi nama induk butuh ETH Sepolia | Sama blocker-nya dengan fixture v4 — danai wallet |
 | Waktu | Menggantikan §8 Layar 2, jadi biaya bersihnya lebih kecil dari 4 jam penuh |
+
+---
+
+## 7 Sept — sumber resmi dari halaman prize, dan koreksi besar
+
+Link resource di halaman prize ETHGlobal menjawab tiga hal yang rencana ini tandai
+`UNVERIFIED`, dan membalik satu asumsi utama.
+
+### Koreksi terpenting: ADA DUA registrar, bukan satu
+
+Saya sebelumnya menyamakan keduanya. Itu keliru dan membuat biaya terlihat jauh
+lebih besar dari sebenarnya.
+
+| | ETHRegistrar (`0xa88553f4…a2cc`) | Registrar subname (kita deploy sendiri) |
+|---|---|---|
+| Untuk | nama induk `.eth` | subname `<tokenId>.envoyage.eth` |
+| `register` | 8 parameter | **`register(string label, address owner, address resolver, uint64 duration)`** |
+| commit-reveal | **wajib** (60s–24j) | **tidak ada** — docs: *"For subnames this is typically unnecessary"* |
+| pembayaran | USDC testnet | **token yang kita tentukan sendiri — boleh tanpa biaya** |
+| berapa kali | **sekali saja** | setiap `grant()` |
+
+Artinya USDC hanya dibutuhkan **satu kali** untuk nama induk. Menerbitkan mandate
+tidak pernah butuh token apa pun, karena kita yang menulis registrar-nya.
+
+### `authorizeTextRoles` — persis mekanisme yang rencana ini butuhkan
+
+Rencana ini menulis: *"Keeper boleh lapor, tidak boleh mengubah scope — role EAC:
+tulis hanya `envoyage:lastRun`"*, dan menandainya belum terverifikasi. Mekanismenya
+ada, dan namanya:
+
+```solidity
+authorizeTextRoles(bytes dnsName, string key, address account, bool grant)
+```
+
+Docs-nya menyebut kasus pakai yang identik: memberi dApp izin menulis **hanya** key
+`avatar` tanpa akses ke record lain. Percobaan menulis key lain revert dengan
+`EACUnauthorizedAccountRoles`.
+
+Untuk Envoyage: pemilik menulis scope; keeper diberi izin satu key
+(`envoyage:lastRun`) dan tidak bisa menyentuh yang lain. **Pembagian yang sama
+persis dengan gerbang di kontrak, ditegakkan substrat berbeda.**
+
+### Konstanta role (terverifikasi)
+
+| Role | Nilai | Scope |
+|---|---|---|
+| `ROLE_SET_ADDR` | `1 << 0` | root / name / **record** |
+| `ROLE_SET_TEXT` | `1 << 4` | root / name / **record** |
+| `ROLE_SET_DATA` | `1 << 36` | root / name / record |
+| `ROLE_UPGRADE` | `1 << 124` | root |
+| `ROLE_REGISTRAR` | `1 << 0` | registry |
+| `ROLE_RENEW` | `1 << 16` | registry |
+
+Varian admin tiap role ada di `role << 128`. Bitmap `uint256`: bit 0–127 role
+biasa, 128–255 role admin, maksimum 15 pemegang per role per resource.
+
+Bitmap saat registrasi, dari tutorial:
+
+```solidity
+uint256 constant REGISTRATION_ROLE_BITMAP =
+      RegistryRolesLib.ROLE_SET_SUBREGISTRY
+    | RegistryRolesLib.ROLE_SET_SUBREGISTRY_ADMIN
+    | RegistryRolesLib.ROLE_SET_RESOLVER
+    | RegistryRolesLib.ROLE_SET_RESOLVER_ADMIN
+    | RegistryRolesLib.ROLE_CAN_TRANSFER_ADMIN;
+```
+
+### `ens-cli` — resmi, dan langsung relevan dengan track
+
+```bash
+alias ens='npx "https://pkg.pr.new/ensdomains/cli/@ensdomains/cli@main"'
+
+ens register commit        # nama induk, lalu tunggu 60 detik
+ens register reveal
+ens subregistry deploy     # UserRegistry untuk nama induk
+ens subregistry set        # arahkan induk ke registry kita
+ens subname create <tokenId>.envoyage.eth --owner 0x… --expiry …
+ens set text …             # scope sebagai text record
+```
+
+Semua perintah tulis mengeluarkan calldata JSON `{to, data, value}` — tidak
+memegang kunci. Cocok untuk dipanggil dari script deploy kita.
+
+Deskripsi resminya: **"Built for autonomous AI agents but works for humans too."**
+Digabung dengan `docs.ens.domains/building-with-ai/`, ini menyentuh langsung
+kalimat bonus di track: *"Bonus points if you bring AI agents into the mix — think
+agents as namespaces, each with their own identity and permissions."* Keeper kita
+memang agent dengan namespace dan permission sendiri.
+
+### Referensi
+
+- `docs.ens.domains/ensv2/tutorial-contract-developers`
+- `docs.ens.domains/ensv2/permissioned-registry`
+- `docs.ens.domains/ensv2/permissioned-resolver`
+- `docs.ens.domains/ensv2/enhanced-access-control`
+- `docs.ens.domains/ensv2/verifiable-factory`
+- `docs.ens.domains/building-with-ai/`
+- `github.com/ensdomains/ens-cli`
+- ENSIP-25, ENSIP-26
+
+### Syarat track, verbatim
+
+- Dibangun di ENSv2 (Sepolia)
+- Fitur ENSv2 **sentral, bukan tempelan kosmetik**
+- Demo **fungsional, bukan nilai hard-coded**
+- Video/live demo + kode open source di GitHub
+
+Hadiah: 1st $1.500 · 2nd $1.500 · 3rd $1.000 · runner-up $500.
