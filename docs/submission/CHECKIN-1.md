@@ -67,11 +67,7 @@ things I'd genuinely value help with:
    each keeper may do. That sounds like Composable. I'd rather be told which is the
    stronger fit than split the difference and be weak at both.
 
-2. Is the Uniswap prize worth one of my three partner slots? I'm net-new, so I read
-   the Continuity track as closed to me, which leaves the smaller one. ENS and The
-   Graph are clearly worth a slot each; I'm unsure the third is best spent there.
-
-3. Judging Round 2 is live, and I'm solo in Indonesia (UTC+7). Depending on the hour
+2. Judging Round 2 is live, and I'm solo in Indonesia (UTC+7). Depending on the hour
    it lands somewhere between 8pm and 1am for me. If there's any flexibility on slot
    times, I'd appreciate knowing early so I can plan around it rather than discover
    it on the day.

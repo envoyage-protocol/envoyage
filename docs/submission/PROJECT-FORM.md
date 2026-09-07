@@ -155,6 +155,10 @@ Replace with the demo video URL before final submission.
 
 ## Prizes to select (max 3 partner prizes)
 
-1. **Uniswap** — Best use of v4 ($1,000, net-new)
+1. **Uniswap** — Best Uniswap Stack Contribution ($3,000 pool, up to 3 teams × $1,000).
+   Open to net-new work, not Continuity-only. **Hard requirements:** public repo,
+   a `FEEDBACK.md`, and a submission to
+   https://developers.uniswap.org/hackathon-feedback linking to it. The README must
+   point at the specific contracts and lines — both done.
 2. **ENS** — Best Use of ENSv2 ($4,500 pool)
 3. **The Graph** — one of the three $5,000 tracks

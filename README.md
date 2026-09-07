@@ -105,6 +105,25 @@ that shows the identical attack draining the contract next to it is not.
 See [`AGENTS.md`](AGENTS.md) for build rules and [`docs/`](docs/) for findings verified
 against the v4 source.
 
+## Where the Uniswap integration lives
+
+For reviewers verifying the v4 integration — the specific contracts and lines:
+
+| What | Where |
+|---|---|
+| Harvest: `DECREASE_LIQUIDITY(0)` + `TAKE_PAIR` | [`src/Envoyage.sol:207-215`](src/Envoyage.sol#L207-L215) |
+| Reinvest: `INCREASE_LIQUIDITY` + `SETTLE_PAIR` | [`src/Envoyage.sol:217-226`](src/Envoyage.sol#L217-L226) |
+| Permit2 two-hop approval (token → Permit2 → POSM) | [`src/Envoyage.sol:234-244`](src/Envoyage.sol#L234-L244) |
+| Sizing the delta with `StateLibrary` + `LiquidityAmounts` | [`src/Envoyage.sol:138-147`](src/Envoyage.sol#L138-L147) |
+| The keeper's entire surface — two integers | [`src/Envoyage.sol:110`](src/Envoyage.sol#L110) |
+| `recipient = address(this)` literal, **not** `ADDRESS_THIS` | [`src/Envoyage.sol:213`](src/Envoyage.sol#L213) |
+| Guard against a *succeeding* zero-delta no-op | [`src/Envoyage.sol:147`](src/Envoyage.sol#L147) |
+| Proof `PositionManager` rejects swap actions | [`test/unit/Spike.t.sol:131`](test/unit/Spike.t.sol#L131) |
+| Proof `INCREASE_LIQUIDITY` needs ERC-721 approval | [`test/unit/Spike.t.sol:106`](test/unit/Spike.t.sol#L106) |
+| All 26 v4 actions traced to file and line | [`docs/V4-ACTION-COMPLETENESS.md`](docs/V4-ACTION-COMPLETENESS.md) |
+
+Feedback for the Uniswap team is in [`FEEDBACK.md`](FEEDBACK.md).
+
 ## Components
 
 | | |
