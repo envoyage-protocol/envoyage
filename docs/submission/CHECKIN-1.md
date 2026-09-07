@@ -28,24 +28,31 @@ Hire a Uniswap v4 keeper without handing it your position. Scoped permission, no
 
 **Is there anything blocking you?**
 ```
-Not blocked on anything external — contract, ENS names, subgraph and keeper bot are
-all live on Sepolia. The real gap is that they are three integrations that don't yet
-talk to each other, and I'd rather name that than claim everything is fine:
+Not blocked on anything external. Contract, ENS names, subgraph and keeper bot are
+all live on Sepolia, and as of today they actually feed each other rather than each
+working alone:
 
-- the web UI reads the chain directly and never queries my own subgraph
-- it doesn't display the ENS name either, so the ENS work currently only shows up in
-  script output
-- the keeper doesn't write its envoyage:lastRun record after compounding; I set that
-  key by hand to prove the permission works
+  subgraph -> keeper decides what to serve -> compounds on chain
+           -> keeper writes its ENS record -> subgraph indexes that execution
 
-Each piece is real, but "functional demo, not hard-coded values" is a fair thing to
-hold me to, and right now one of those records genuinely was set by hand. Wiring
-them together is my next block of work, ahead of any new features.
+The keeper no longer scans logs for its work. It asks the subgraph which mandates
+name it, what each permits, and which has gone longest without service. Remove the
+subgraph and the bot has no work list.
 
-One question I'd value a Graph mentor's read on: which track my subgraph best fits.
-It indexes the granted permission scope alongside the keeper's actual behaviour on
-the same entity, which feels closer to the standardized-schema angle than to
-"querying one subgraph" — but I'd rather be told than guess, since a wrong pick
+That change also fixed a real bug I'd have shipped otherwise: over a wide block
+range a public RPC returned an EMPTY eth_getLogs array rather than an error, so the
+bot logged "no mandates granted" while a live mandate naming it sat on chain. An
+empty answer and no answer were indistinguishable.
+
+One honest gap remains: the web UI still reads the chain directly and shows neither
+the subgraph nor the ENS name, so two of my three integrations are invisible on
+screen. That is my next block of work — a demo that only proves itself in a terminal
+isn't a demo.
+
+One question I'd value a Graph mentor's read on: which track fits best. My subgraph
+is load-bearing for automation — it decides what the bot works on and in what order,
+which reads like the AI/automation track — but it's a single product, so I don't
+think it qualifies as "composable". I'd rather be told than guess, since a wrong pick
 wastes one of three prize slots.
 
 A note in case it saves someone time: deploying against a Studio slug that doesn't
@@ -54,9 +61,8 @@ and isn't one.
 ```
 
 **How confident do you feel about submitting?**
-Confident — the core is deployed, verified and working end-to-end. The remaining
-work is wiring the three integrations to each other, which is well understood
-rather than risky.
+Confident — everything is deployed and working end-to-end on Sepolia. What's left is
+the web UI and the demo video, both well understood rather than risky.
 
 **Anything else you think we should know?**
 ```
@@ -106,11 +112,14 @@ All five pieces are live on Sepolia, not planned:
   intention.
 - ENSv2: 38896.envoyage.eth resolves the mandate's full scope in any ENS client, so
   it can be read without trusting my frontend. The keeper holds authorizeTextRoles
-  on exactly one key — writing envoyage:lastRun succeeds, writing
-  envoyage:maxFeeBps reverts EACUnauthorizedAccountRoles. Same division the
+  on exactly one key, and it writes that record itself after each run — I cleared it
+  to "CLEARED-BY-HAND", ran the bot unattended, and it now reads "11655313", the
+  block its compound landed in. envoyage:maxFeeBps is still "200", because the same
+  call aimed at that key reverts EACUnauthorizedAccountRoles. Same division the
   contract's gate enforces, on a different substrate.
-- Subgraph live at api.studio.thegraph.com/query/62788/envoyage/v0.0.2, indexing
-  the granted scope beside actual behaviour on one entity.
+- Subgraph live at api.studio.thegraph.com/query/62788/envoyage/v0.0.2, indexing the
+  granted scope beside actual behaviour on one entity — and driving the keeper's
+  decisions, not just displaying history.
 - A web UI reading live state directly over two independent RPC operators.
 
 38 Solidity tests plus 5 subgraph tests, forge lint clean. The exploit replay is
