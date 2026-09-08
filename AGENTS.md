@@ -1,168 +1,168 @@
 # AGENTS.md — Envoyage
 
-> **Revisi 4 Sept 2026.** Enam instruksi di draf awal bertabrakan dengan temuan yang
-> sudah diverifikasi terhadap source `v4-periphery`. Yang berubah ditandai 🔴 beserta
-> alasannya. Baca `docs/SETUP-LANDMINES.md` dan `docs/BUILD-GUIDE.md` sebelum mulai.
+> **Revised 4 Sept 2026, status updated 8 Sept.** Six instructions in the first draft
+> contradicted findings verified against the `v4-periphery` source. Changes are marked
+> 🔴 with the reason. The markers are kept deliberately: they are the record of how
+> this project's AI was directed and where it was corrected.
+>
+> Read `docs/SETUP-LANDMINES.md` and `docs/BUILD-GUIDE.md` before starting.
 
 ## Context
 
-Envoyage adalah instrumen izin ter-scope untuk keeper posisi Uniswap v4. Hari ini,
-mendelegasikan posisi berarti `approve` atau `setApprovalForAll` — keduanya membatasi
-*posisi mana*, tidak ada yang membatasi *aksi apa*.
+Envoyage is a scoped-permission instrument for Uniswap v4 position keepers. Today,
+delegating a position means `approve` or `setApprovalForAll` — both constrain *which
+position*, neither constrains *what may be done to it*.
 
-ETHGlobal Online 2026. Solo. ~38 jam. Sepolia (11155111). MIT.
+ETHGlobal Online 2026. Solo. Sepolia (11155111). MIT.
 
-**Arsitektur inti — menyusun, bukan memvalidasi.** Keeper tidak pernah menulis
-instruksi v4. Keeper memanggil `compound(mandateId, minFee)` — dua angka. Envoyage
-yang menyusun array aksi v4 dan mengunci recipient ke pemilik posisi.
+**Core architecture — assemble, don't validate.** The keeper never writes v4
+instructions. It calls `compound(mandateId, minFee)` — two numbers. Envoyage assembles
+the v4 action array itself and pins the recipient to the position owner.
 
-Penyalahgunaan bukan diblokir pemeriksaan. Ia tidak bisa diekspresikan.
+Misuse is not blocked by a check. It cannot be expressed.
 
-🔴 **Headline tesis (direvisi):**
-> **Envoyage menghapus wewenang atas tujuan. Ia tidak menghapus wewenang atas eksekusi.**
+🔴 **Headline thesis (revised):**
+> **Envoyage removes authority over intent. It does not remove authority over execution.**
 
-Versi lama ("penyalahgunaan tidak bisa diekspresikan") patah oleh satu pertanyaan juri
-tentang swap. Versi ini benar secara harfiah dan tetap merupakan kontribusi nyata.
-
----
-
-## HARD RULES — jangan dilanggar, bahkan bila terasa lebih fleksibel
-
-1. **Jangan pernah menambah fungsi yang menerima `bytes calldata` dari keeper.**
-   Bukan untuk "extensibility", bukan untuk "aksi masa depan".
-2. **Jangan pernah menjadikan alamat recipient sebagai parameter.** Recipient
-   diturunkan di dalam kontrak dari pemilik posisi, atau dibaca dari struct mandate
-   di mana ia dikunci saat grant.
-3. **Jangan pernah decode-lalu-validasi input keeper.** Kalau kamu mulai menulis
-   validator untuk array aksi, berhenti — itu persis kelas kegagalan yang merusak
-   Revert V3Utils (Code4rena H-04), V3Vault (H-03), dan Aperture (~$17M).
-4. **Jangan melebarkan permukaan entrypoint tanpa diminta.** v0 hanya mengirim
-   `compound`. `rebalance` dan `exit` adalah interface tanpa implementasi.
-
-5. 🔴 **JANGAN memancarkan event sebelum revert. Itu mustahil.**
-   *(Menggantikan aturan lama "Emit `MandateRejected` BEFORE reverting.")*
-   Revert membuang **seluruh** perubahan state, termasuk log yang sudah dipancarkan.
-   Aturan lama membantah dirinya sendiri. Kode akan terlihat benar, menghasilkan nol
-   event, dan `vm.expectEmit` + `vm.expectRevert` **tidak** menangkapnya.
-   **Sebagai gantinya:** `MandateRejected` dihapus dari ABI. Sediakan
-   `canCompound(uint256 mandateId) external view returns (bytes4 reason)` — `0x0`
-   berarti boleh. UI memakai view ini. Reputasi keeper = eksekusi + umur + status.
-   Nyatakan di README bahwa penolakan on-chain tidak terindeks, dan kenapa.
-
-6. **Jangan pernah menebak alamat kontrak ter-deploy.** Uniswap memperingatkan alamat
-   tidak lagi sama lintas chain. 🔴 Sudah selesai: enam alamat Sepolia terverifikasi
-   dengan `cast code` di `docs/SEPOLIA.md`. **Pakai itu, jangan cari lagi.**
-7. **Commit kecil dan sering, pesan bermakna.** ETHGlobal memeriksa version control;
-   satu commit besar bisa mendiskualifikasi. Jangan pernah squash.
-8. **Semua file spec/prompt/perencanaan wajib di-commit** — juri ingin melihat
-   bagaimana AI diarahkan. File ini termasuk.
-
-9. 🔴 **JANGAN menambahkan swap ke `compound`.** Dua alasan independen:
-   - **Mustahil:** `_handleAction` men-dispatch tepat 15 aksi, nol di antaranya swap.
-     `SWAP_EXACT_IN_SINGLE` (0x06) ada di `Actions.sol` tapi jatuh ke
-     `revert UnsupportedAction`. Aksi swap hidup di `V4Router`, bukan PositionManager.
-   - **Tidak aman:** keeper adalah *designated caller* — dia memilih blok, jadi dia
-     bisa sandwich `compound`-nya sendiri. Recipient tetap pemilik sepanjang serangan.
-10. 🔴 **JANGAN pakai `INCREASE_LIQUIDITY_FROM_DELTAS` (0x04) atau
-    `MINT_POSITION_FROM_DELTAS` (0x05).** Komentar Uniswap sendiri:
-    *"DEPRECATED: Vulnerable to sandwich attacks - do not use."* Selalu
-    `INCREASE_LIQUIDITY` eksplisit dengan `amount0Max`/`amount1Max`.
-11. 🔴 **Envoyage IMMUTABLE.** Tanpa proxy, tanpa admin/owner, tanpa fungsi upgrade,
-    tanpa `delegatecall`, tanpa `selfdestruct`. Alamat POSM/Permit2 `immutable` di
-    constructor. Kalau ada admin, kalimat pitch inti bukan lemah — **salah**.
-12. 🔴 **Jangan sentuh `foundry.toml` atau `remappings.txt`.** Enam ranjau setup sudah
-    diledakkan dan harness terbukti hijau. Lihat `docs/SETUP-LANDMINES.md`.
-
-Kalau sebuah aturan menghalangi kebutuhan, **katakan dan berhenti**. Jangan diakali.
+The earlier version ("misuse cannot be expressed") broke under a single judge question
+about swaps. This version is literally true and remains a real contribution.
 
 ---
 
-## ~~Task 1 — Repo setup~~ ✅ SELESAI (3 Sept)
+## HARD RULES — do not break, even when breaking one looks more flexible
 
-🔴 **Jangan dijalankan ulang.** Instruksi lama "install v4-core and v4-periphery" adalah
-ranjau #3: v4-core standalone tidak punya `src/types/PoolOperation.sol` dan tidak
-kompatibel. Repo memakai v4-core/permit2/OZ/solmate yang **dibawa** v4-periphery.
+1. **Never add a function that accepts `bytes calldata` from the keeper.** Not for
+   "extensibility", not for "future actions".
+2. **Never make a recipient address a parameter.** The recipient is derived inside the
+   contract from the position owner, or read from the mandate struct where it was
+   pinned at grant time.
+3. **Never decode-then-validate keeper input.** If you start writing a validator for an
+   action array, stop — that is precisely the failure class that broke Revert V3Utils
+   (Code4rena H-04), V3Vault (H-03), and Aperture (~$17M).
+4. **Do not widen the entrypoint surface unasked.** v0 ships `compound` only.
+   `rebalance` and `exit` are interface declarations with no implementation.
 
-Terbukti: clone segar → `./script/setup.sh` → `forge build` →
+5. 🔴 **DO NOT emit an event before reverting. It is impossible.**
+   *(Replaces the earlier rule "Emit `MandateRejected` BEFORE reverting.")*
+   A revert discards **all** state changes, including logs already emitted. The old
+   rule contradicted itself. The code would look correct, produce zero events, and
+   `vm.expectEmit` + `vm.expectRevert` would **not** catch it.
+   **Instead:** `MandateRejected` is absent from the ABI. Provide
+   `canCompound(uint256 mandateId) external view returns (bytes4 reason)` — `0x0` means
+   allowed. The UI reads that view. Keeper reputation = executions + age + status.
+   State in the README that on-chain refusals are not indexed, and why.
+
+6. **Never guess a deployed contract address.** Uniswap warns that addresses are no
+   longer identical across chains. 🔴 Done: six Sepolia addresses verified with
+   `cast code` in `docs/SEPOLIA.md`. **Use those; do not look them up again.**
+7. **Commit small and often, with meaningful messages.** ETHGlobal inspects version
+   control; a single large commit can disqualify. Never squash.
+8. **Every spec/prompt/planning file must be committed** — judges want to see how the
+   AI was directed. This file included.
+
+9. 🔴 **DO NOT add a swap to `compound`.** Two independent reasons:
+   - **Impossible:** `_handleAction` dispatches exactly 15 actions, none of them swaps.
+     `SWAP_EXACT_IN_SINGLE` (0x06) exists in `Actions.sol` but falls through to
+     `revert UnsupportedAction`. Swap actions live in `V4Router`, not PositionManager.
+   - **Unsafe:** the keeper is the *designated caller* — it picks the block, so it can
+     sandwich its own `compound`. The recipient stays the owner throughout the attack,
+     so nothing looks wrong.
+10. 🔴 **DO NOT use `INCREASE_LIQUIDITY_FROM_DELTAS` (0x04) or
+    `MINT_POSITION_FROM_DELTAS` (0x05).** Uniswap's own comment:
+    *"DEPRECATED: Vulnerable to sandwich attacks - do not use."* Always explicit
+    `INCREASE_LIQUIDITY` with `amount0Max`/`amount1Max`.
+11. 🔴 **Envoyage is IMMUTABLE.** No proxy, no admin/owner, no upgrade function, no
+    `delegatecall`, no `selfdestruct`. POSM/Permit2 addresses `immutable` in the
+    constructor. If there is an admin, the core pitch sentence is not weakened — it is
+    **false**.
+12. 🔴 **Do not touch `foundry.toml` or `remappings.txt`.** Six setup landmines have
+    been stepped on already and the harness is proven green. See
+    `docs/SETUP-LANDMINES.md`.
+
+If a rule blocks a genuine requirement, **say so and stop**. Do not work around it.
+
+---
+
+## ~~Task 1 — Repo setup~~ ✅ DONE (3 Sept)
+
+🔴 **Do not re-run.** The old instruction "install v4-core and v4-periphery" is
+landmine #3: standalone v4-core lacks `src/types/PoolOperation.sol` and is
+incompatible. The repo uses the v4-core/permit2/OZ/solmate that v4-periphery
+**vendors**.
+
+Proven: fresh clone → `./script/setup.sh` → `forge build` →
 `[PASS] test_harnessMintsRealPosition()`.
 
 ---
 
-## Task 2 — Fixture Sepolia — SEPARUH SELESAI
+## ~~Task 2 — Sepolia fixture~~ ✅ DONE (6 Sept)
 
-### ✅ Langkah 1 selesai
-Enam alamat di `docs/SEPOLIA.md`, diverifikasi `cast code`, sumber
-`developers.uniswap.org/docs/protocols/v4/deployments`. StateView on-chain 3531 bytes
-= hasil kompilasi lokal, jadi versi yang dipin cocok dengan yang ter-deploy.
-RPC: `https://ethereum-sepolia-rpc.publicnode.com` (`rpc.sepolia.org` **404**).
+Six addresses in `docs/SEPOLIA.md`, verified with `cast code`, sourced from
+`developers.uniswap.org/docs/protocols/v4/deployments`. StateView on-chain is 3531
+bytes = our local compile, so the pinned version matches what is deployed.
+RPC: `https://ethereum-sepolia-rpc.publicnode.com` (`rpc.sepolia.org` is **404**).
 
-### ☐ Langkah 2–3 belum
-```
-Tulis skrip Foundry yang: deploy dua ERC20 test, initialize pool v4,
-mint posisi via PositionManager, cetak tokenId. Jalankan ke Sepolia.
-Laporkan tokenId dan tx hash.
-```
+Live: pool with a 1% static LP fee, position `#38896`, Envoyage at
+`0x8466e82E02edF3F00c0387D5C3E66d407dc7259C`, all verified on Etherscan.
 
-🔴 **Wajib: LP fee statis TINGGI (10000–100000 = 1–10%, BUKAN 3000/0,3%).**
-Mode gagalnya senyap: fee terlalu kecil → `getLiquidityForAmounts` mengembalikan 0 →
-`INCREASE_LIQUIDITY` jadi no-op yang **sukses**, event tetap terbit, demo terlihat
-jalan padahal tidak terjadi apa-apa.
-
-Fee juga harus **dibangkitkan** — mint saja tidak menghasilkan fee. Butuh self-trade
-lewat UniversalRouter (Permit2 lagi).
-
-Kalau ada yang memblokir (faucet, RPC, deploy), **BERHENTI dan lapor**.
+🔴 The fee had to be HIGH (10000–100000 = 1–10%, **not** 3000/0.3%). The failure mode
+is silent: fees too small → `getLiquidityForAmounts` returns 0 →
+`INCREASE_LIQUIDITY` becomes a **succeeding** no-op, the event still fires, and the
+demo looks alive while nothing happened. `script/02_GenerateFees.s.sol` generates the
+fees, because minting alone produces none.
 
 ---
 
-## Task 3 — Tabel kelengkapan aksi v4
+## ~~Task 3 — v4 action completeness table~~ ✅ DONE
 
-Artefak dengan nilai tertinggi untuk skor Technicality. Output adalah draf — akan
-diverifikasi manual baris per baris.
+The highest-value artifact for the Technicality score. See
+`docs/V4-ACTION-COMPLETENESS.md` — all 26 actions traced to file and line.
+
+The brief that produced it, kept for the record:
 
 ```
-Baca lib/v4-periphery:
+Read lib/v4-periphery:
 - src/libraries/Actions.sol
-- _handleAction di src/PositionManager.sol
+- _handleAction in src/PositionManager.sol
 - DeltaResolver (_take, _settle, _sweep)
 - BaseActionsRouter (_mapRecipient, _mapPayer)
 
-Enumerasi SETIAP konstanta aksi. Untuk masing-masing:
-- Bisakah aksi ini memindahkan token keluar dari kendali pemilik posisi? (ya/tidak)
-- Recipient-nya dari mana — parameter dari pemanggil, atau nilai turunan?
-- Apakah _handleAction benar-benar men-dispatch-nya, atau jatuh ke UnsupportedAction?
-- File dan nomor baris
+Enumerate EVERY action constant. For each:
+- Can this action move tokens out of the position owner's control? (yes/no)
+- Where does its recipient come from — a caller parameter, or a derived value?
+- Does _handleAction actually dispatch it, or does it fall through to UnsupportedAction?
+- File and line number
 
-Tabel markdown. Kutip kode asli untuk setiap baris.
-JANGAN menyimpulkan perilaku dari nama aksi. Kalau tidak bisa ditelusuri: "UNVERIFIED".
+Markdown table. Quote the original code for every row.
+DO NOT infer behaviour from an action's name. If it cannot be traced: "UNVERIFIED".
 ```
 
-🔴 Kolom ketiga adalah tambahan, dan justru yang paling bernilai: ia menunjukkan
-`Actions.sol` mendeklarasikan aksi yang PositionManager tolak — temuan yang membentuk
-seluruh desain kita.
+🔴 The third column was an addition, and turned out to be the most valuable: it shows
+`Actions.sol` declaring actions that PositionManager rejects — the finding that shaped
+the entire design.
 
-Fakta yang sudah diverifikasi (pakai sebagai kontrol kebenaran agent):
-`_handleAction` menangani INCREASE_LIQUIDITY, INCREASE_LIQUIDITY_FROM_DELTAS,
-DECREASE_LIQUIDITY, MINT_POSITION, MINT_POSITION_FROM_DELTAS, BURN_POSITION,
-SETTLE_PAIR, TAKE_PAIR, SETTLE, TAKE, CLOSE_CURRENCY, CLEAR_OR_TAKE, SWEEP, WRAP,
-UNWRAP — 15 aksi, sisanya `revert UnsupportedAction(action)`.
+Verified facts (use as a correctness control on any agent's output): `_handleAction`
+handles INCREASE_LIQUIDITY, INCREASE_LIQUIDITY_FROM_DELTAS, DECREASE_LIQUIDITY,
+MINT_POSITION, MINT_POSITION_FROM_DELTAS, BURN_POSITION, SETTLE_PAIR, TAKE_PAIR,
+SETTLE, TAKE, CLOSE_CURRENCY, CLEAR_OR_TAKE, SWEEP, WRAP, UNWRAP — 15 actions;
+everything else hits `revert UnsupportedAction(action)`.
 
 ---
 
-## Task 4 — Kontrak inti
+## ~~Task 4 — Core contract~~ ✅ DONE
 
-🔴 Struct di bawah **menggantikan** versi draf. Dua field ditambahkan karena review
-adversarial menemukan lubang nyata; jangan dihapus.
+🔴 The struct below **replaces** the draft version. Two fields were added because
+adversarial review found real holes; do not remove them.
 
 ```solidity
 struct Mandate {
     address keeper;
-    address grantor;      // 🔴 pemilik saat grant. compound WAJIB cek ownerOf == grantor.
+    address grantor;      // 🔴 owner at grant time. compound MUST check ownerOf == grantor.
     uint256 tokenId;
     uint16  maxFeeBps;
-    address feeRecipient; // dikunci saat grant
+    address feeRecipient; // pinned at grant time
     uint64  expiry;
-    uint64  minInterval;  // 🔴 cooldown antar compound, dikunci saat grant
+    uint64  minInterval;  // 🔴 cooldown between compounds, pinned at grant time
     uint64  lastCall;
     bool    compoundAllowed;
 }
@@ -173,19 +173,20 @@ function compound(uint256 mandateId, uint256 minFee) external;
 function canCompound(uint256 mandateId) external view returns (bytes4 reason);
 ```
 
-**Kenapa `grantor`:** tanpanya, mandate bertahan setelah posisi dijual. Penjual
-mempertahankan hak `compound` atas posisi pembeli dengan `feeRecipient` menunjuk ke
-penjual. Itu persis kelas Code4rena H-04 yang kita klaim cegah.
-**Kenapa `minInterval`:** tanpanya keeper memanggil sesering mungkin dan menguras
-nilai lewat biaya berulang.
+**Why `grantor`:** without it a mandate survives the sale of the position. The seller
+keeps `compound` rights over the buyer's position with `feeRecipient` still pointing at
+the seller. That is exactly the Code4rena H-04 class we claim to prevent.
 
-🔴 **Satu tokenId hanya boleh punya SATU mandate hidup.** Ini membuat pencabutan
-atomik secara gratis, membuat cap fee benar-benar sebuah cap, dan membuat halaman
-mandate = kebenaran lengkap tentang posisi itu.
+**Why `minInterval`:** without it the keeper calls as often as possible and drains
+value through repeated fees.
 
-⚠️ **Aturan ini TIDAK bisa ditegakkan dari struct saja.** `Mandate` di-key oleh
-`mandateId`; revoke-lalu-grant menghasilkan `mandateId` kedua untuk `tokenId` yang
-sama, dan tidak ada apa pun untuk diperiksa. Wajib ada state terpisah:
+🔴 **A tokenId may have exactly ONE live mandate.** This makes revocation atomic for
+free, makes a fee cap genuinely a cap, and makes the mandate page the complete truth
+about that position.
+
+⚠️ **This rule CANNOT be enforced from the struct alone.** `Mandate` is keyed by
+`mandateId`; revoke-then-grant produces a second `mandateId` for the same `tokenId`
+with nothing to check against. Separate state is required:
 
 ```solidity
 mapping(uint256 tokenId => uint256 activeMandateId) public activeMandate;
@@ -194,108 +195,134 @@ mapping(uint256 tokenId => uint256 activeMandateId) public activeMandate;
 // revoke(): delete activeMandate[tokenId];
 ```
 
-Tanpa ini, klaim keamanan di §6b tidak punya penegak. Jangan biarkan agent
-menyimpulkan pemeriksaan yang tidak punya sasaran.
+Without this the security claim has no enforcer. Do not let an agent infer a check
+that has nothing to check against.
 
-### Gerbang yang revert
-kedaluwarsa · dicabut · pemanggil bukan keeper terdaftar · `compound` tidak diizinkan ·
+### Gates that revert
+
+expired · revoked · caller is not the registered keeper · `compound` not permitted ·
 🔴 `ownerOf(tokenId) != m.grantor` · 🔴 `block.timestamp < lastCall + minInterval` ·
-fee melebihi `maxFeeBps` · hasil di bawah `minFee`
-🔴 ~~slippage breach~~ — **dihapus**: tanpa swap tidak ada harga.
+fee exceeds `maxFeeBps` · proceeds below `minFee`
+🔴 ~~slippage breach~~ — **removed**: with no swap there is no price.
 
-### Urutan `compound` (terverifikasi terhadap `_handleAction`)
+### `compound` sequence (verified against `_handleAction`)
 
 ```
-── Panggilan 1: panen ──────────────────────────────
-   DECREASE_LIQUIDITY(tokenId, 0, min0, min1, "")   // tidak ada aksi "collect" di v4
+── Call 1: harvest ─────────────────────────────────
+   DECREASE_LIQUIDITY(tokenId, 0, min0, min1, "")   // v4 has no "collect" action
    TAKE_PAIR(currency0, currency1, recipient = ENVOYAGE)
 
-── Di dalam Envoyage ───────────────────────────────
+── Inside Envoyage ─────────────────────────────────
    fee = balanceAfter − balanceBefore
    feeKeeper = fee × maxFeeBps / 10_000  →  m.feeRecipient
    liquidityDelta = LiquidityAmounts.getLiquidityForAmounts(
-       StateLibrary.getSlot0(...), tickLower, tickUpper, sisa0, sisa1)
-   if (liquidityDelta == 0) revert ZeroLiquidityDelta();   // 🔴 WAJIB
+       StateLibrary.getSlot0(...), tickLower, tickUpper, rest0, rest1)
+   if (liquidityDelta == 0) revert ZeroLiquidityDelta();   // 🔴 MANDATORY
 
-── Panggilan 2: tanam kembali ──────────────────────
+── Call 2: reinvest ────────────────────────────────
    INCREASE_LIQUIDITY(tokenId, liquidityDelta, max0, max1, "")
-   SETTLE_PAIR(currency0, currency1)     // bayar lewat Permit2 dari Envoyage
+   SETTLE_PAIR(currency0, currency1)     // paid via Permit2 from Envoyage
 
-── Bersihkan ───────────────────────────────────────
-   sisa saldo → PEMILIK POSISI (konstanta di kontrak)
-   assert saldo Envoyage == 0
+── Clean up ────────────────────────────────────────
+   remaining balance → POSITION OWNER (a constant in the contract)
+   assert Envoyage balance == 0
 ```
 
-**DUA panggilan `modifyLiquidities`, bukan satu.** `liquidityDelta` baru bisa dihitung
-setelah tahu berapa fee yang dipanen.
+**TWO `modifyLiquidities` calls, not one.** `liquidityDelta` cannot be computed until
+the harvested fees are known.
 
-🔴 **Permit2 wajib di constructor.** `_settlePair` memakai `msgSender()` = Envoyage,
-dan `_pay` bercabang ke Permit2 untuk payer selain POSM. Per token:
+🔴 **Permit2 approvals are mandatory.** `_settlePair` uses `msgSender()` = Envoyage,
+and `_pay` branches to Permit2 for any payer other than POSM. Per token:
 ```solidity
 token.approve(PERMIT2, type(uint256).max);
 IAllowanceTransfer(PERMIT2).approve(token, POSM, type(uint160).max, type(uint48).max);
 ```
-Kalau terlewat: lolos di unit test bermock, meledak pertama kali di Sepolia.
-**Jangan** pakai jalan pintas `payerIsUser=false` — dust tertinggal di posm dan bisa
-diambil siapa pun.
+Miss it and everything passes against mocked unit tests, then fails on the first real
+Sepolia call. **Do not** take the `payerIsUser=false` shortcut — dust is left in the
+posm and anyone can take it.
 
-🔴 **Klaim kustodi (dikoreksi dari draf).** Draf menulis "Envoyage must never custody
-funds" — terlalu absolut. Fee **harus** mendarat di Envoyage untuk diukur. Klaim yang
-benar: **non-kustodial antar-transaksi** — saldo hanya ada di dalam satu transaksi,
-nol di antaranya. Buktikan dengan assert saldo == 0 di akhir tiap tx.
+🔴 **Custody claim (corrected from the draft).** The draft said "Envoyage must never
+custody funds" — too absolute. Fees **must** land in Envoyage to be measured. The
+correct claim: **non-custodial between transactions** — a balance exists only inside a
+single transaction and is zero between them. Prove it by asserting balance == 0 at the
+end of every tx.
 
-Tulis unit test bersamaan. **Jangan** tulis invariant test — properti ditulis manusia.
-
----
-
-## Urutan
-
-1. ~~Repo setup~~ ✅
-2. **Fixture Sepolia** — memblokir semuanya
-3. Tabel kelengkapan
-4. Kontrak inti + unit test
-5. Invariant test — 🔴 properti ditulis manusia; agent boleh handler/setup.
-   Wajib ada `invariant_callsActuallyLanded()` yang menuntut `successfulCompounds > 0`,
-   kalau tidak properti lolos secara hampa karena semua panggilan revert.
-6. Exploit replay — 🔴 **wajib menyertakan `NaiveUtils.execute(tokenId, bytes)` ~30 baris
-   sebagai pembanding rentan.** Tanpa itu suite-nya tautologis: kamu tidak bisa menulis
-   eksploit terhadap fungsi yang tidak ada. Tunjukkan serangan **berhasil** melawan
-   NaiveUtils, lalu tidak bisa di-encode melawan Envoyage.
-   Tambahkan juga: transfer posisi lalu `compound` harus revert.
-7. Subgraph → Subgraph MCP — 🔴 MCP harus membaca **dua** subgraph (Envoyage + Uniswap v4).
-   Track menolak *"simply querying one Subgraph"*.
-8. UI: layar grant + halaman mandate yang bisa dibagikan
-9. README, model ancaman, video demo
-
-Jangan melompat. Kalau terblokir, **lapor**, jangan ganti tugas yang lebih mudah.
+Write unit tests alongside. **Do not** write invariant tests — properties are written
+by a human.
 
 ---
 
-## 🔴 Slot sponsor (final, 5 Sept)
+## Order of work
+
+| | | |
+|---|---|---|
+| 1 | Repo setup | ✅ |
+| 2 | Sepolia fixture | ✅ |
+| 3 | Action completeness table | ✅ |
+| 4 | Core contract + unit tests | ✅ 38 tests |
+| 5 | Invariant tests | ✅ |
+| 6 | Exploit replay | ✅ |
+| 7 | Subgraph | ✅ live |
+| 8 | UI: grant screen + shareable mandate page | ✅ (the mandate page became ENS resolution) |
+| 9 | README, threat model, demo video | ⬜ video outstanding |
+
+Notes that shaped 5–7, kept because they are the reason those artifacts are worth
+anything:
+
+- 🔴 **Item 5:** properties are written by a human; an agent may write handlers and
+  setup. There must be a check that calls actually landed, requiring
+  `successfulCompounds > 0` — otherwise every property passes vacuously because all
+  calls reverted. *In the event this could not live in an `invariant_` function or in
+  `afterInvariant()`; see the note in `test/invariant/Envoyage.invariant.t.sol` for
+  why, and `HandlerReachability.t.sol` for where it ended up.*
+- 🔴 **Item 6:** must include a ~30-line `NaiveUtils.execute(tokenId, bytes)` as a
+  vulnerable comparator. Without it the suite is tautological: you cannot write an
+  exploit against a function that does not exist. Show the attack **succeeding**
+  against NaiveUtils, then un-encodable against Envoyage. Also: transfer the position,
+  then `compound` must revert.
+- 🔴 **Item 7:** The Graph's Composable track rejects *"simply querying one
+  Subgraph"*. *Satisfied two ways in the event: the UI composes our Studio subgraph
+  with Uniswap's own v4 subgraph through the Gateway, and the subgraph is load-bearing
+  for the keeper's decisions. See `SKILL.md`.*
+
+Do not skip ahead. If blocked, **report it**; do not substitute an easier task.
+
+---
+
+## 🔴 Sponsor slots (final)
 
 | Slot | Track | Takeable |
 |---|---|---|
-| The Graph | Composable — jalur **skema terstandardisasi** (bukan MCP/Substreams) | $2.500 |
-| Uniswap Foundation | Best Uniswap Stack Contribution | $1.000 |
-| **ENS** | Best Use of ENSv2 — lihat `docs/ENS-PLAN.md` | $1.500 |
+| Uniswap Foundation | Best Uniswap Stack Contribution | $3,000 pool, up to 3 × $1,000 |
+| ENS | Best Use of ENSv2 — see `docs/ENS-PLAN.md` | $4,500 pool |
+| The Graph | AI Tooling (From Scratch) **or** Composable — both fit; see `SKILL.md` | $5,000 pool each |
 
-~~Ledger~~ dibatalkan 5 Sept: `wallet-cli send` butuh perangkat fisik (tidak ada
-emulator/Speculos yang didokumentasikan), dan dukungan Sepolia tidak terkonfirmasi
-di dokumentasi mana pun. Dua risiko independen untuk satu slot.
+Maximum three partner prizes, so exactly one Graph track.
 
-ENSv2 justru fit lebih baik: teks track meminta *"delegate specific rights"* lewat
-Enhanced Access Control dan subname yang *"expiring, revocable"* — itu tesis Envoyage
-di substrat lain. Alamat ENSv2 Sepolia sudah diverifikasi on-chain.
+**Uniswap has hard qualification requirements** beyond the build: a public repo, a
+`FEEDBACK.md`, a submission to `developers.uniswap.org/hackathon-feedback` linking to
+it, and a README that points at the specific contracts and lines.
 
-## Dokumen rujukan
+~~Ledger~~ was dropped on 5 Sept: `wallet-cli send` needs physical hardware (no
+documented emulator/Speculos path) and Sepolia support was unconfirmed in any
+documentation. Two independent risks for one slot.
 
-| File | Isi |
+ENSv2 fits better anyway: the track text asks for *"delegate specific rights"* through
+Enhanced Access Control and subnames that are *"expiring, revocable"* — which is
+Envoyage's thesis on another substrate.
+
+## Reference documents
+
+| File | Contents |
 |---|---|
-| `../../prd.md` | PRD lengkap: jadwal, alokasi jam, model ancaman, checklist bounty |
-| `docs/BUILD-GUIDE.md` | Temuan terverifikasi terhadap source v4 |
-| `docs/SETUP-LANDMINES.md` | Enam ranjau setup; jangan utak-atik konfigurasi |
-| `docs/SEPOLIA.md` | Alamat terverifikasi + RPC yang jalan |
-| `docs/THREAT-MODEL.md` | Apa yang Envoyage TIDAK lindungi |
-| `docs/V4-ACTION-COMPLETENESS.md` | 26 aksi v4 ditelusuri ke nomor baris |
-| `docs/ENS-PLAN.md` | Slot ENSv2: mandate sebagai subname |
-| `docs/GRAPH-PLAN.md` | Jalur The Graph |
+| `docs/ARCHITECTURE.md` | System shape, compound sequence, trust boundaries, tech stack |
+| `docs/BUILD-GUIDE.md` | Findings verified against the v4 source |
+| `docs/SETUP-LANDMINES.md` | Six setup landmines; do not touch the config |
+| `docs/SEPOLIA.md` | Verified addresses, live deployment, working RPCs |
+| `docs/THREAT-MODEL.md` | What Envoyage does NOT protect against |
+| `docs/V4-ACTION-COMPLETENESS.md` | 26 v4 actions traced to line numbers |
+| `docs/ENS-PLAN.md` | The ENSv2 slot: a mandate as a subname |
+| `docs/GRAPH-PLAN.md` | The Graph path |
+| `SKILL.md` | How The Graph is load-bearing rather than decorative |
+| `FEEDBACK.md` | Feedback to the Uniswap team (a prize requirement) |
+| `AI-USAGE.md` | Required AI disclosure, including what AI got wrong |
