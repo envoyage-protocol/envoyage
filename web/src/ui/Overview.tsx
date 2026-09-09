@@ -1,7 +1,7 @@
 import {useEffect, useState} from "react";
 import {formatUnits, type Hex} from "viem";
 import {ENVOYAGE, EXPLORER, DEMO_MANDATE_ID, ENS_PARENT, KEEPER_KEY} from "../lib/config";
-import {fetchEnvoyage, fetchUniswapScale, type Census, type UniswapScale, type MandateRow, type Execution as GraphExecution} from "../lib/graph";
+import {fetchEnvoyage, fetchUniswapScale, fetchMainnetCensus, type Census, type UniswapScale, type MandateRow, type Execution as GraphExecution} from "../lib/graph";
 import {
   readMandate,
   readCanCompound,
@@ -46,6 +46,9 @@ export function Overview() {
   // Distinguishes "not attempted" from "attempted and failed". Without it a Gateway
   // outage renders as "no key configured", which blames the wrong thing.
   const [scaleError, setScaleError] = useState<string | null>(null);
+  // Mainnet census: our handler on Ethereum mainnet. Loads independently of Sepolia.
+  const [mainnet, setMainnet] = useState<{census: Census; indexedBlock: number} | null>(null);
+  const [mainnetError, setMainnetError] = useState<string | null>(null);
   const [ens, setEns] = useState<{node: string; records: Record<string, string>} | null>(null);
   const [graphError, setGraphError] = useState<string | null>(null);
 
@@ -87,6 +90,10 @@ export function Overview() {
         setGraphExecs(d.executions);
       })
       .catch((e) => setGraphError(e instanceof Error ? e.message : String(e)));
+
+    fetchMainnetCensus()
+      .then(setMainnet)
+      .catch((e) => setMainnetError(e instanceof Error ? e.message : String(e)));
 
     fetchUniswapScale()
       .then(setScale)
@@ -396,44 +403,62 @@ export function Overview() {
         <div className="section-head">
           <span className="n" aria-hidden="true">4</span>
           <h2 id="s5">Why it matters</h2>
-          <p>A census of every live delegation on Uniswap v4's PositionManager, Sepolia, indexed by our subgraph.</p>
+          <p>
+            Every delegation ever granted on Uniswap v4's PositionManager, counted by our own subgraph —
+            on <strong>Ethereum mainnet</strong>, where the money is, and on Sepolia, where the scoped
+            alternative runs.
+          </p>
         </div>
 
+        {mainnetError && (
+          <div className="error" role="alert">
+            <b>Mainnet census unavailable.</b>
+            <span>Figures are withheld rather than shown as zero. <code>{mainnetError}</code></span>
+          </div>
+        )}
         {graphError && (
           <div className="error" role="alert">
-            <b>Subgraph query failed.</b>
+            <b>Sepolia subgraph query failed.</b>
             <span>Figures are withheld rather than shown as zero. <code>{graphError}</code></span>
           </div>
         )}
-        {!census && !graphError && <p className="pending">Reading the subgraph…</p>}
+        {!mainnet && !mainnetError && <p className="pending">Reading the mainnet census…</p>}
 
-        {census && (
+        {mainnet && (
           <>
             <div className="census">
               <div>
-                <div className="figure num">{unbounded}</div>
+                <div className="net-tag">Ethereum mainnet</div>
+                <div className="figure num">
+                  {mainnet.census.activeBlanketApprovals + mainnet.census.activeUnscopedApprovals}
+                </div>
                 <p className="caption">
-                  <strong>unbounded delegations</strong> — {census.activeBlanketApprovals} via{" "}
-                  <code>setApprovalForAll</code>, {census.activeUnscopedApprovals} single-position approvals.
-                  Each one can withdraw everything it covers.
+                  <strong>unbounded delegations over real positions</strong> —{" "}
+                  {mainnet.census.activeBlanketApprovals} via <code>setApprovalForAll</code> (every position the
+                  owner holds, now and in future), {mainnet.census.activeUnscopedApprovals} single-position. Each one
+                  can withdraw everything it covers. {mainnet.census.activeScopedApprovals === 0 && "Zero are scoped: no bounded alternative exists on mainnet."}
                 </p>
               </div>
               <div className="vs" aria-hidden="true">against</div>
               <div className="scoped">
-                <div className="figure num">{scoped}</div>
+                <div className="net-tag">Sepolia</div>
+                <div className="figure num">{scoped ?? "…"}</div>
                 <p className="caption">
-                  <strong>scoped</strong> — Envoyage mandates, each limited to <code>compound</code> with a capped fee, a cooldown and an expiry.
+                  <strong>scoped</strong> — Envoyage mandates, each limited to <code>compound</code> with a capped fee,
+                  a cooldown and an expiry.{" "}
+                  {census && <>Beside {unbounded} unbounded ones on the same testnet.</>}
                 </p>
               </div>
             </div>
             <p className="census-foot">
-              {census.distinctDelegates} distinct delegates hold those approvals, across{" "}
-              {census.totalApprovalEvents} approval events since indexing began
-              {indexedBlock ? ` · indexed to block ${indexedBlock}` : ""}.
+              Mainnet: {mainnet.census.distinctDelegates} distinct delegates across {mainnet.census.totalApprovalEvents}{" "}
+              approval events, indexed to block {mainnet.indexedBlock.toLocaleString()}.
+              {census && indexedBlock && (
+                <> Sepolia: {census.distinctDelegates} delegates, {census.totalApprovalEvents} events, block {indexedBlock.toLocaleString()}.</>
+              )}
               {scale && (
-                <> On Ethereum mainnet, Uniswap v4 has {Number(scale.pools).toLocaleString()} pools and{" "}
-                {Number(scale.txCount).toLocaleString()} transactions; every position there that wants
-                automation has only an unbounded approval to offer it.</>
+                <> Uniswap's own subgraph puts v4 at {Number(scale.pools).toLocaleString()} pools and{" "}
+                {Number(scale.txCount).toLocaleString()} transactions.</>
               )}
             </p>
           </>
@@ -445,13 +470,22 @@ export function Overview() {
         <div className="section-head">
           <span className="n" aria-hidden="true">5</span>
           <h2 id="s6">Where the numbers come from</h2>
-          <p>Two Graph products, composed. Neither answers the question alone.</p>
+          <p>Three Graph sources — two of them ours, one Uniswap's. None answers the question alone.</p>
         </div>
-        <div className="sources">
+        <div className="sources sources-3">
           <div className="source">
-            <h3>Envoyage subgraph — Subgraph Studio</h3>
+            <h3>Envoyage subgraph — Sepolia</h3>
             <p>Mandates, executions, and the census of approvals on the PositionManager. Knows exactly what each keeper may do; knows nothing about the wider population.</p>
             <div className="meta">api.studio.thegraph.com/query/62788/envoyage/v0.0.4</div>
+          </div>
+          <div className="source">
+            <h3>Envoyage census — Ethereum mainnet</h3>
+            <p>The same census handler pointed at Uniswap v4's mainnet PositionManager. Counts every unbounded delegation over real positions; its scoped count is zero, because nothing scoped exists there yet.</p>
+            <div className="meta">
+              api.studio.thegraph.com/query/62788/envoyage-census-mainnet/v0.0.1
+              {mainnet && <> · block {mainnet.indexedBlock.toLocaleString()}</>}
+              {mainnetError && <> · {mainnetError.slice(0, 80)}</>}
+            </div>
           </div>
           <div className="source">
             <h3>Uniswap v4 subgraph — The Graph Network</h3>

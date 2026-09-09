@@ -109,6 +109,35 @@ export async function fetchEnvoyage(): Promise<{
   };
 }
 
+/// Our own census handler, deployed against Uniswap v4's PositionManager on Ethereum
+/// MAINNET. Same code as the Sepolia census; different network, real money.
+///
+/// This replaces a dependency on Uniswap's official subgraph through the Gateway for
+/// the headline figure. That subgraph returned "bad indexers … too far behind" on
+/// 9 Sept, and a demo should not depend on someone else's indexers. The Gateway
+/// composition is kept below as an additional source when it is up.
+export const MAINNET_CENSUS =
+  import.meta.env.VITE_MAINNET_CENSUS_URL ??
+  "https://api.studio.thegraph.com/query/62788/envoyage-census-mainnet/v0.0.1";
+
+export async function fetchMainnetCensus(): Promise<{census: Census; indexedBlock: number}> {
+  const d = await gql<{censuses: Census[]; _meta: {block: {number: number}; hasIndexingErrors: boolean}}>(
+    MAINNET_CENSUS,
+    `{
+      _meta { block { number } hasIndexingErrors }
+      censuses { activeBlanketApprovals activePositionApprovals activeScopedApprovals
+                 activeUnscopedApprovals distinctDelegates totalApprovalEvents }
+    }`
+  );
+  if (d._meta.hasIndexingErrors) throw new Error("mainnet census has indexing errors");
+  const census = d.censuses[0];
+  // A census entity that does not exist yet means the sync has not reached the first
+  // approval — a pending state, not zero exposure. Throw so the UI says "syncing",
+  // never "0 wallets exposed".
+  if (!census) throw new Error("mainnet census still syncing — no approvals indexed yet");
+  return {census, indexedBlock: d._meta.block.number};
+}
+
 export type UniswapScale = {pools: string; txCount: string; sampledOwners: number};
 
 /// The population the problem applies to. Every one of these positions that wants

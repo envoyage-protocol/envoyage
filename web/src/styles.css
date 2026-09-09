@@ -392,3 +392,8 @@ footer.foot {
 .keeper-actions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); align-items: start; }
 @media (max-width: 720px) { .keeper-actions { grid-template-columns: 1fr; } }
 .keeper-actions > div { display: flex; flex-direction: column; }
+
+.net-tag { font: 600 var(--text-xs)/1 var(--font-body); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-text-muted); margin-block-end: var(--space-2); }
+.census .scoped .net-tag { color: var(--color-accent-text); }
+.sources-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 900px) { .sources-3 { grid-template-columns: 1fr; } }
