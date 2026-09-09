@@ -2,7 +2,7 @@
 out/
 cache/
 broadcast/*/dry-run/
-lib/
+/lib/
 
 # node
 node_modules/

@@ -1,0 +1,33 @@
+import {sepolia} from "viem/chains";
+
+export const CHAIN = sepolia;
+
+/// Verified on Etherscan. See docs/SEPOLIA.md.
+export const ENVOYAGE = "0x8466e82E02edF3F00c0387D5C3E66d407dc7259C" as const;
+export const POSITION_MANAGER = "0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4" as const;
+
+/// Two operators, not two endpoints from one. A single provider's keys share a
+/// failure domain, so a fallback across them never actually fails over.
+export const RPC_URLS = [
+  "https://ethereum-sepolia-rpc.publicnode.com",
+  "https://1rpc.io/sepolia"
+];
+
+export const EXPLORER = "https://sepolia.etherscan.io";
+
+/// The live demo mandate, so the page has something to show with no wallet
+/// connected and no setup. A demo that requires setup before it shows anything is
+/// a demo that fails in front of judges.
+export const DEMO_MANDATE_ID = 1n;
+
+/// Envoyage's contract-creation block, read from the transaction receipt. Log
+/// queries start here; scanning from 0 times out on every public RPC.
+export const DEPLOY_BLOCK = 11644424n;
+
+/// ENSv2 (Sepolia beta). Deployed by script/06_EnsNames.s.sol.
+export const ENS_PARENT = "envoyage.eth";
+export const ENVOYAGE_NAMES = "0x307CF6B0022Ef757820A8C3Cfced97C324eE0d05" as const;
+export const ENS_RESOLVER = "0xAF5b8aCF804e59fb823C05D37e73D523Af2Eca8a" as const;
+
+/// The one text key a keeper may write. Everything else on the name is the owner's.
+export const KEEPER_KEY = "envoyage:lastRun";
