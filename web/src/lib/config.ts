@@ -31,3 +31,9 @@ export const ENS_RESOLVER = "0xAF5b8aCF804e59fb823C05D37e73D523Af2Eca8a" as cons
 
 /// The one text key a keeper may write. Everything else on the name is the owner's.
 export const KEEPER_KEY = "envoyage:lastRun";
+
+/// The deliberately vulnerable comparator, live on Sepolia (script/08_DeployNaive).
+/// Its position is approved to it — the same unbounded approval every automation
+/// contract asks for today — so the theft can be performed for real, not described.
+export const NAIVE = "0x0Fc426408a752f46d46b1e182aa018647146Aa56" as const;
+export const NAIVE_VICTIM_TOKEN_ID = 39022n;
