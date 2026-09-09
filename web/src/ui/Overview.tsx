@@ -1,12 +1,14 @@
 import {useEffect, useState} from "react";
 import {formatUnits, type Hex} from "viem";
 import {ENVOYAGE, EXPLORER, DEMO_MANDATE_ID, ENS_PARENT, KEEPER_KEY} from "../lib/config";
-import {fetchEnvoyage, fetchUniswapScale, type Census, type UniswapScale, type MandateRow} from "../lib/graph";
+import {fetchEnvoyage, fetchUniswapScale, type Census, type UniswapScale, type MandateRow, type Execution as GraphExecution} from "../lib/graph";
 import {
   readMandate,
   readCanCompound,
   readPositionOwner,
-  readExecutions,
+  readExecutionsAudit,
+  type OperatorReport,
+  // kept only as an independent cross-check of the subgraph, not to render the ledger
   readEnsScope,
   REFUSAL_REASONS,
   type Mandate,
@@ -27,11 +29,18 @@ export function Overview() {
   // null until the chain has answered. An empty array would render "no executions"
   // while the read is still in flight — a pending state shown as an empty fact.
   const [execs, setExecs] = useState<Execution[] | null>(null);
+  const [operators, setOperators] = useState<OperatorReport[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [census, setCensus] = useState<Census | null>(null);
   const [indexedBlock, setIndexedBlock] = useState<number | null>(null);
   const [rows, setRows] = useState<MandateRow[]>([]);
+  // The execution HISTORY is rendered from our subgraph — this is what the subgraph
+  // is for. The RPC log read below is kept only to cross-check the count, which is
+  // how we caught an RPC returning 1 of 3 earlier: the subgraph is now ground truth
+  // and the chain is the audit.
+  const [graphExecs, setGraphExecs] = useState<GraphExecution[] | null>(null);
+  const [pool, setPool] = useState<{currency0: string; currency1: string} | null>(null);
 
   const [scale, setScale] = useState<UniswapScale | null>(null);
   // Distinguishes "not attempted" from "attempted and failed". Without it a Gateway
@@ -48,15 +57,19 @@ export function Overview() {
         const [r, p, e] = await Promise.all([
           readCanCompound(DEMO_MANDATE_ID),
           readPositionOwner(m.tokenId),
-          readExecutions(DEMO_MANDATE_ID)
+          readExecutionsAudit(DEMO_MANDATE_ID)
         ]);
         setReason(r);
         setPos(p);
-        setExecs(e);
+        setExecs(e.executions);
+        setOperators(e.operators);
 
         // ENS is read through the resolver, not reused from the values above, so what
         // is shown here is what a stranger's ENS client would get.
         readEnsScope(m.tokenId).then(setEns).catch(() => {});
+        import("../lib/actions").then(({positionCurrencies}) =>
+          positionCurrencies(m.tokenId).then(setPool).catch(() => {})
+        );
       } catch (err) {
         // Surfaced rather than swallowed. An empty page that silently failed to read
         // the chain looks identical to a page with nothing to show.
@@ -71,6 +84,7 @@ export function Overview() {
         setCensus(d.census);
         setRows(d.mandates);
         setIndexedBlock(d.indexedBlock);
+        setGraphExecs(d.executions);
       })
       .catch((e) => setGraphError(e instanceof Error ? e.message : String(e)));
 
@@ -86,9 +100,21 @@ export function Overview() {
   const allowedNow = reason === "0x00000000";
 
   const sum = (xs: bigint[]) => xs.reduce((a, b) => a + b, 0n);
-  const liqAdded = sum((execs ?? []).map((e) => e.liquidityAdded));
-  const fee0 = sum((execs ?? []).map((e) => e.fee0Paid));
-  const fee1 = sum((execs ?? []).map((e) => e.fee1Paid));
+  const gx = graphExecs ?? [];
+  const liqAdded = sum(gx.map((e) => BigInt(e.liquidityAdded)));
+  const fee0 = sum(gx.map((e) => BigInt(e.fee0ToKeeper)));
+  const fee1 = sum(gx.map((e) => BigInt(e.fee1ToKeeper)));
+  // The chain cross-check, phrased per operator. "0 on RPC" printed as a bare number
+  // reads as a discrepancy with the subgraph; per-operator it reads as what it is —
+  // one node down and one node wrong — which is the finding, not a contradiction.
+  const rpcCount = execs?.length ?? null;
+  const countMatches = rpcCount !== null && graphExecs !== null && rpcCount === graphExecs.length;
+  const crossCheck = (() => {
+    if (!operators || graphExecs === null) return null;
+    if (countMatches) return `Cross-checked against the chain: ${rpcCount} events over ${operators.filter((o) => o.status === "ok").length} RPC operator(s), matches.`;
+    const detail = operators.map((o) => `${o.host} ${o.status === "ok" ? `returned ${o.count}` : "failed"}`).join("; ");
+    return `Chain cross-check inconclusive — ${detail}. The subgraph indexes from its own node and is the record here.`;
+  })();
 
   const unbounded = census ? census.activeBlanketApprovals + census.activeUnscopedApprovals : null;
   const scoped = census ? census.activeScopedApprovals : null;
@@ -141,8 +167,14 @@ export function Overview() {
               <div className="instrument-title">
                 Mandate №{DEMO_MANDATE_ID.toString()}
                 <small>
-                  Limited authority over Uniswap v4 position #{mandate.tokenId.toString()} · granted{" "}
-                  by its owner · {revoked ? "revoked" : `valid until ${fmtDate(mandate.expiry)}`}
+                  Limited authority over Uniswap v4 position #{mandate.tokenId.toString()}
+                  {pool && (
+                    <>
+                      {" "}in the {link(`token/${pool.currency0}`, short(pool.currency0))} /{" "}
+                      {link(`token/${pool.currency1}`, short(pool.currency1))} pool
+                    </>
+                  )}{" "}
+                  · granted by its owner · {revoked ? "revoked" : `valid until ${fmtDate(mandate.expiry)}`}
                 </small>
               </div>
               {revoked ? (
@@ -260,18 +292,18 @@ export function Overview() {
           <p>Every <code>MandateExecuted</code> event this mandate has emitted on Sepolia.</p>
         </div>
 
-        {!error && execs === null && <p className="pending">Reading execution logs from both RPC operators…</p>}
-        {execs !== null && execs.length === 0 && <p className="pending">No executions yet.</p>}
-        {execs !== null && execs.length > 0 && (
+        {graphExecs === null && !graphError && <p className="pending">Loading execution history from the subgraphâ¦</p>}
+        {graphExecs !== null && graphExecs.length === 0 && <p className="pending">No executions indexed yet.</p>}
+        {graphExecs !== null && graphExecs.length > 0 && (
           <>
             <div className="stats">
               <div className="stat">
                 <div className="label">Compounds</div>
-                <div className="value">{execs.length}</div>
-                <div className="note">each one triggered by the keeper's key</div>
+                <div className="value">{graphExecs.length}</div>
+                <div className="note">indexed by the Envoyage subgraph</div>
               </div>
               <div className="stat">
-                <div className="label">Liquidity added to the owner's position</div>
+                <div className="label">Liquidity added to the owner’s position</div>
                 <div className="value accent" title={`+${fmtLiq(liqAdded)}`}>+{fmtLiqShort(liqAdded)}</div>
                 <div className="note">no swap; sized from harvested fees only</div>
               </div>
@@ -284,32 +316,36 @@ export function Overview() {
 
             <div className="ledger-wrap">
               <table className="ledger">
-                <caption className="visually-hidden">Executions of mandate {DEMO_MANDATE_ID.toString()}</caption>
+                <caption className="visually-hidden">Executions of mandate {DEMO_MANDATE_ID.toString()}, from the subgraph</caption>
                 <thead>
                   <tr>
+                    <th scope="col">When</th>
                     <th scope="col">Block</th>
                     <th scope="col">Liquidity added</th>
-                    <th scope="col">Fee to keeper (token0 / token1)</th>
-                    <th scope="col">Liquidity to keeper</th>
+                    <th scope="col">Fee to keeper (0 / 1)</th>
+                    <th scope="col">To keeper</th>
                     <th scope="col">Transaction</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {execs.map((e) => (
-                    <tr key={e.txHash}>
-                      <td className="num">{e.block.toString()}</td>
-                      <td className="num">+{fmtLiq(e.liquidityAdded)}</td>
-                      <td className="num">{fmtLiq(e.fee0Paid)} / {fmtLiq(e.fee1Paid)}</td>
+                  {[...graphExecs].reverse().map((e) => (
+                    <tr key={e.id}>
+                      <td className="num">{new Date(Number(e.timestamp) * 1000).toISOString().slice(0, 10)}</td>
+                      <td className="num">{e.block}</td>
+                      <td className="num">+{fmtLiq(BigInt(e.liquidityAdded))}</td>
+                      <td className="num">{fmtLiq(BigInt(e.fee0ToKeeper))} / {fmtLiq(BigInt(e.fee1ToKeeper))}</td>
                       <td className="num zero">0</td>
-                      <td>{link(`tx/${e.txHash}`, short(e.txHash))}</td>
+                      <td>{link(`tx/${e.tx}`, short(e.tx))}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             <p className="census-foot">
-              Totals: {fmtLiq(fee0)} token0 and {fmtLiq(fee1)} token1 to the keeper — the capped share of
-              harvested fees. Envoyage's own balance is zero after every transaction.
+              Rendered from the subgraph.{" "}
+              {crossCheck}{" "}
+              Totals: {fmtLiq(fee0)} / {fmtLiq(fee1)} to the keeper, the capped share of harvested fees;
+              Envoyage holds zero after every transaction.
             </p>
           </>
         )}

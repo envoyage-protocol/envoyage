@@ -159,37 +159,39 @@ export type Execution = {
   liquidityAdded: bigint;
 };
 
-export async function readExecutions(id: bigint): Promise<Execution[]> {
-  // Queried against EVERY operator and unioned, not read through the fallback.
-  //
-  // The fallback transport only fails over on an error. On 9 Sept 1rpc.io answered
-  // this exact query with zero logs and HTTP 200 while publicnode returned three,
-  // so the page rendered "1 execution" as if it were the truth — a partial answer
-  // is indistinguishable from a small one unless a second operator is asked.
-  // Logs are append-only, so a union by transaction hash is always safe.
+export type OperatorReport = {host: string; status: "ok" | "failed"; count: number};
+
+/// Per-operator log query. Returned alongside the union so a caller can SAY what
+/// happened instead of collapsing three different situations into one number.
+///
+/// This exists because of two observed failures on 9 Sept, hours apart:
+///   - 1rpc.io answered getLogs with zero logs and HTTP 200 while publicnode had 3.
+///   - later, in the browser, publicnode was rate-limited and FAILED, so the only
+///     operator that answered was the one returning a false zero — and a union of
+///     one wrong answer is that wrong answer.
+/// A bare count cannot distinguish "truly none" from "the honest node was down".
+/// The report can.
+export async function readExecutionsAudit(id: bigint): Promise<{executions: Execution[]; operators: OperatorReport[]}> {
   const results = await Promise.allSettled(
     RPC_URLS.map((url) =>
       createPublicClient({chain: CHAIN, transport: http(url)}).getLogs({
         address: ENVOYAGE,
         event: MANDATE_EXECUTED,
         args: {id},
-        // The deployment block, from the transaction receipt. Starting at 0n would
-        // make every page load scan the whole chain and time out on a public RPC.
         fromBlock: DEPLOY_BLOCK,
         toBlock: "latest"
       })
     )
   );
 
-  const ok = results.filter((r) => r.status === "fulfilled");
-  // Every operator failing is an error to surface, never an empty ledger.
-  if (ok.length === 0) {
-    const first = results[0];
-    throw first.status === "rejected" ? first.reason : new Error("no RPC answered");
-  }
+  const operators: OperatorReport[] = results.map((r, i) => ({
+    host: new URL(RPC_URLS[i]).host,
+    status: r.status === "fulfilled" ? "ok" : "failed",
+    count: r.status === "fulfilled" ? r.value.length : 0
+  }));
 
   const byTx = new Map<string, Execution>();
-  for (const r of ok) {
+  for (const r of results) {
     if (r.status !== "fulfilled") continue;
     for (const l of r.value) {
       byTx.set(l.transactionHash, {
@@ -201,7 +203,16 @@ export async function readExecutions(id: bigint): Promise<Execution[]> {
       });
     }
   }
-  return [...byTx.values()].sort((a, b) => (a.block < b.block ? -1 : a.block > b.block ? 1 : 0));
+  const executions = [...byTx.values()].sort((a, b) => (a.block < b.block ? -1 : a.block > b.block ? 1 : 0));
+  return {executions, operators};
+}
+
+/// Union only. Throws if no operator answered, so an empty ledger is never rendered
+/// in place of a failed read.
+export async function readExecutions(id: bigint): Promise<Execution[]> {
+  const {executions, operators} = await readExecutionsAudit(id);
+  if (operators.every((o) => o.status === "failed")) throw new Error("no RPC operator answered");
+  return executions;
 }
 
 
