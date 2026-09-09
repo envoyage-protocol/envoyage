@@ -24,7 +24,9 @@ export function App() {
   const [mandate, setMandate] = useState<Mandate | null>(null);
   const [reason, setReason] = useState<Hex | null>(null);
   const [pos, setPos] = useState<{owner: string; approved: string} | null>(null);
-  const [execs, setExecs] = useState<Execution[]>([]);
+  // null until the chain has answered. An empty array would render "no executions"
+  // while the read is still in flight — a pending state shown as an empty fact.
+  const [execs, setExecs] = useState<Execution[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [census, setCensus] = useState<Census | null>(null);
@@ -32,6 +34,9 @@ export function App() {
   const [rows, setRows] = useState<MandateRow[]>([]);
 
   const [scale, setScale] = useState<UniswapScale | null>(null);
+  // Distinguishes "not attempted" from "attempted and failed". Without it a Gateway
+  // outage renders as "no key configured", which blames the wrong thing.
+  const [scaleError, setScaleError] = useState<string | null>(null);
   const [ens, setEns] = useState<{node: string; records: Record<string, string>} | null>(null);
   const [graphError, setGraphError] = useState<string | null>(null);
 
@@ -69,335 +74,378 @@ export function App() {
       })
       .catch((e) => setGraphError(e instanceof Error ? e.message : String(e)));
 
-    fetchUniswapScale().then(setScale).catch(() => {});
+    fetchUniswapScale()
+      .then(setScale)
+      .catch((e) => setScaleError(e instanceof Error ? e.message : String(e)));
   }, []);
 
+
+  // ── derived ───────────────────────────────────────────────────────────────
   const revoked = mandate !== null && mandate.keeper === "0x0000000000000000000000000000000000000000";
   const approvedToEnvoyage = pos?.approved.toLowerCase() === ENVOYAGE.toLowerCase();
+  const allowedNow = reason === "0x00000000";
+
+  const sum = (xs: bigint[]) => xs.reduce((a, b) => a + b, 0n);
+  const liqAdded = sum((execs ?? []).map((e) => e.liquidityAdded));
+  const fee0 = sum((execs ?? []).map((e) => e.fee0Paid));
+  const fee1 = sum((execs ?? []).map((e) => e.fee1Paid));
+
+  const unbounded = census ? census.activeBlanketApprovals + census.activeUnscopedApprovals : null;
+  const scoped = census ? census.activeScopedApprovals : null;
+
+  const fmtDate = (t: bigint) =>
+    t === 0n ? "—" : new Date(Number(t) * 1000).toISOString().slice(0, 10);
+  const fmtLiq = (v: bigint) => formatUnits(v, 18);
+  // Headline figures are rounded so a 20-digit value never has to wrap; the ledger
+  // below carries every digit, so nothing is lost — only moved.
+  const fmtLiqShort = (v: bigint) => Number(formatUnits(v, 18)).toFixed(6);
 
   return (
-    <div className="wrap">
-      <header>
-        <h1>Envoyage</h1>
-        <p className="tag">
-          Removes authority over <strong>intent</strong>. Not authority over <strong>execution</strong>.
-        </p>
+    <div className="page">
+      <header className="masthead">
+        <div className="brand">
+          <img src="/logo.png" alt="" width={44} />
+          <span>Envoyage</span>
+        </div>
         <p className="chain">
-          Sepolia · {link(`address/${ENVOYAGE}#code`, ENVOYAGE)} · verified
+          <span className="dot" aria-hidden="true" />
+          Sepolia · {link(`address/${ENVOYAGE}#code`, short(ENVOYAGE))} · verified source
         </p>
       </header>
 
-      <section className="panel">
-        <h2>The exposure, counted</h2>
-        {!census && !graphError && <p className="muted">Reading the subgraph…</p>}
-        {graphError && <p className="err small mono">subgraph: {graphError}</p>}
-        {census && (
-          <>
-            <div className="grid2">
-              <div className="cmp danger">
-                <p className="sub" style={{marginBottom: 6}}>Unbounded delegation, live on Uniswap v4</p>
-                <p className="big" style={{margin: 0}}>
-                  {census.activeBlanketApprovals + census.activeUnscopedApprovals}
-                </p>
-                <ul style={{marginTop: 10}}>
-                  <li>
-                    <strong>{census.activeBlanketApprovals}</strong> <code>setApprovalForAll</code> —
-                    every position the owner holds, now and in future
-                  </li>
-                  <li>
-                    <strong>{census.activeUnscopedApprovals}</strong> single-position approvals
-                    with no scope attached
-                  </li>
-                  <li>
-                    across <strong>{census.distinctDelegates}</strong> distinct delegate addresses
-                  </li>
-                </ul>
-              </div>
-              <div className="cmp safe">
-                <p className="sub" style={{marginBottom: 6}}>Delegation that carries a scope</p>
-                <p className="big" style={{margin: 0}}>{census.activeScopedApprovals}</p>
-                <ul style={{marginTop: 10}}>
-                  <li>Approvals pointing at Envoyage, where the recipient is fixed in code</li>
-                  <li>Fee capped in bps of harvested fees, never of the position</li>
-                  <li>Dies the moment the position changes hands</li>
-                </ul>
-              </div>
-            </div>
-            <p className="small muted" style={{marginBottom: 0}}>
-              Counted from every <code>Approval</code> and <code>ApprovalForAll</code> emitted by
-              Uniswap v4&rsquo;s PositionManager on Sepolia
-              {indexedBlock && <> · indexed to block {indexedBlock.toLocaleString()}</>}
-              {scale && (
-                <>
-                  {" "}· for scale, v4 on mainnet holds{" "}
-                  <strong>{Number(scale.pools).toLocaleString()}</strong> pools across{" "}
-                  <strong>{Number(scale.txCount).toLocaleString()}</strong> transactions
-                </>
-              )}
-            </p>
-          </>
-        )}
-      </section>
-
-      {error && (
-        <div className="panel">
-          <h2>Could not read the chain</h2>
-          <p className="err mono small">{error}</p>
-        </div>
-      )}
-
-      <section className="panel">
-        <h2>The problem, in one comparison</h2>
-        <div className="grid2">
-          <div className="cmp danger">
-            <h3>approve(keeper, tokenId)</h3>
-            <p className="sub">What every keeper needs today</p>
-            <ul>
-              <li>The keeper writes the v4 action list itself</li>
-              <li><strong>4 actions</strong> take a recipient straight from the caller</li>
-              <li>Nothing stops <code>DECREASE_LIQUIDITY</code> + <code>TAKE_PAIR(…, attacker)</code></li>
-              <li>No fee cap, no cooldown, no expiry</li>
-              <li>Survives the sale of the position</li>
-            </ul>
-          </div>
-          <div className="cmp safe">
-            <h3>A mandate</h3>
-            <p className="sub">What Envoyage grants instead</p>
-            <ul>
-              <li><strong>Envoyage</strong> writes the action list; the keeper passes two numbers</li>
-              <li>Recipient is a constant in code, not a parameter</li>
-              <li>The attack above has no field to be expressed in</li>
-              <li>Fee capped in bps of <em>harvested fees</em>, never of the position</li>
-              <li>Dies the moment the position changes hands</li>
-            </ul>
-          </div>
-        </div>
-        <p className="small muted" style={{marginTop: 14, marginBottom: 0}}>
-          All 26 v4 actions were traced against the source; see{" "}
-          <a href="https://github.com/envoyage-protocol/envoyage/blob/main/docs/V4-ACTION-COMPLETENESS.md">
-            V4-ACTION-COMPLETENESS.md
-          </a>
-          .
+      {/* 1 ── what this is, before any number */}
+      <section className="lede" aria-labelledby="lede-h">
+        <h1 id="lede-h">
+          A keeper that can <em>grow</em> your position and do nothing else with it.
+        </h1>
+        <p>
+          On Uniswap v4, the only way to let a bot compound your fees is{" "}
+          <code>approve(keeper, tokenId)</code> — which says <strong>which</strong> position it may
+          touch and nothing about <strong>what</strong> it may do. An approved bot can withdraw
+          the liquidity and send it to itself. Envoyage replaces that with a{" "}
+          <strong>mandate</strong>: the bot passes two numbers, and the contract writes the
+          Uniswap instructions itself, with the destination fixed in code.
         </p>
       </section>
 
-      <section className="panel">
-        <h2>Live mandate #{DEMO_MANDATE_ID.toString()}</h2>
-        {!mandate && !error && <p className="muted">Reading Sepolia…</p>}
+      {/* 2 ── the instrument */}
+      <section className="section" aria-labelledby="s2">
+        <div className="section-head">
+          <span className="n" aria-hidden="true">1</span>
+          <h2 id="s2">The mandate</h2>
+          <p>What this keeper may do to position #{mandate?.tokenId.toString() ?? "…"}, and what it may not. Read live from the contract.</p>
+        </div>
+
+        {error && (
+          <div className="error" role="alert">
+            <b>Could not read Sepolia.</b>
+            <span>
+              Nothing below this line is shown until the chain answers. <code>{error}</code>
+            </span>
+          </div>
+        )}
+        {!mandate && !error && <p className="pending">Reading the mandate from Sepolia…</p>}
+
         {mandate && (
-          <div className="grid2">
-            <table>
-              <tbody>
-                <tr>
-                  <td>Status</td>
-                  <td>
-                    {revoked ? <span className="pill bad">REVOKED</span> : <span className="pill ok">ACTIVE</span>}
-                  </td>
-                </tr>
-                <tr>
-                  <td>Keeper</td>
-                  <td>{link(`address/${mandate.keeper}`, short(mandate.keeper))}</td>
-                </tr>
-                <tr>
-                  <td>Granted by</td>
-                  <td>{link(`address/${mandate.grantor}`, short(mandate.grantor))}</td>
-                </tr>
-                <tr>
-                  <td>Position</td>
-                  <td className="mono">#{mandate.tokenId.toString()}</td>
-                </tr>
-                <tr>
-                  <td>Fee cap</td>
-                  <td>
-                    <strong>{(mandate.maxFeeBps / 100).toFixed(2)}%</strong>{" "}
-                    <span className="muted small">of harvested fees</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td>Fee paid to</td>
-                  <td>{link(`address/${mandate.feeRecipient}`, short(mandate.feeRecipient))}</td>
-                </tr>
-                <tr>
-                  <td>Cooldown</td>
-                  <td>{mandate.minInterval.toString()}s</td>
-                </tr>
-                <tr>
-                  <td>Expires</td>
-                  <td>
-                    {mandate.expiry === 0n
-                      ? "—"
-                      : new Date(Number(mandate.expiry) * 1000).toISOString().slice(0, 16).replace("T", " ")}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-
-            <div>
-              <div className="cmp" style={{marginBottom: 14}}>
-                <h3 style={{fontSize: 13, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".06em"}}>
-                  Can the keeper act right now?
-                </h3>
-                <p style={{margin: "6px 0 0"}}>
-                  {reason === null ? (
-                    <span className="muted">checking…</span>
-                  ) : reason === "0x00000000" ? (
-                    <span className="pill ok">YES</span>
-                  ) : (
-                    <span className="pill warn">NO</span>
-                  )}{" "}
-                  {reason && <span className="small">{REFUSAL_REASONS[reason] ?? `Unknown selector ${reason}`}</span>}
-                </p>
-                <p className="small muted" style={{marginBottom: 0, marginTop: 10}}>
-                  Read from <code>canCompound()</code>. The contract cannot emit an event explaining a
-                  refusal — a revert would discard the log — so the reason is returned by a view
-                  function instead.
-                </p>
+          <article className="instrument" aria-label={`Mandate ${DEMO_MANDATE_ID}`}>
+            <div className="instrument-top">
+              <div className="instrument-title">
+                Mandate №{DEMO_MANDATE_ID.toString()}
+                <small>
+                  Limited authority over Uniswap v4 position #{mandate.tokenId.toString()} · granted{" "}
+                  by its owner · {revoked ? "revoked" : `valid until ${fmtDate(mandate.expiry)}`}
+                </small>
               </div>
-
-              {pos && (
-                <table>
-                  <tbody>
-                    <tr>
-                      <td>Position owner</td>
-                      <td>{link(`address/${pos.owner}`, short(pos.owner))}</td>
-                    </tr>
-                    <tr>
-                      <td>ERC-721 approved to</td>
-                      <td>
-                        {approvedToEnvoyage ? (
-                          <>
-                            <span className="pill ok">Envoyage</span>{" "}
-                            <span className="small muted">not the keeper</span>
-                          </>
-                        ) : (
-                          link(`address/${pos.approved}`, short(pos.approved))
-                        )}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+              {revoked ? (
+                <span className="seal off">Revoked</span>
+              ) : (
+                <span className="seal">In force</span>
               )}
             </div>
-          </div>
+
+            <dl className="parties">
+              <div className="party">
+                <dt>Granted by</dt>
+                <dd>{link(`address/${mandate.grantor}`, short(mandate.grantor))} <span className="pending">— the position's owner</span></dd>
+              </div>
+              <div className="party">
+                <dt>Granted to</dt>
+                <dd>{link(`address/${mandate.keeper}`, short(mandate.keeper))} <span className="pending">— the keeper</span></dd>
+              </div>
+              <div className="party">
+                <dt>Authority held by</dt>
+                <dd>
+                  {pos ? (
+                    approvedToEnvoyage ? (
+                      <>Envoyage <span className="pending">— never the keeper</span></>
+                    ) : (
+                      link(`address/${pos.approved}`, short(pos.approved))
+                    )
+                  ) : (
+                    <span className="pending">reading…</span>
+                  )}
+                </dd>
+              </div>
+            </dl>
+
+            <div className="powers">
+              <div className="permitted">
+                <h3><span className="tag">Permitted</span> The keeper may</h3>
+                <ul>
+                  <li>
+                    <span className="glyph" aria-hidden="true">✓</span>
+                    <span>Call <strong>compound</strong> — harvest fees and reinvest them into this position</span>
+                  </li>
+                  <li>
+                    <span className="glyph" aria-hidden="true">✓</span>
+                    <span>
+                      Keep at most <span className="num">{(mandate.maxFeeBps / 100).toFixed(2)}%</span> of the{" "}
+                      <strong>fees harvested</strong> — never of the position
+                    </span>
+                  </li>
+                  <li>
+                    <span className="glyph" aria-hidden="true">✓</span>
+                    <span>Be paid only to {link(`address/${mandate.feeRecipient}`, short(mandate.feeRecipient))}, fixed when the mandate was granted</span>
+                  </li>
+                  <li>
+                    <span className="glyph" aria-hidden="true">✓</span>
+                    <span>Act no more than once every <span className="num">{mandate.minInterval.toString()}s</span></span>
+                  </li>
+                  <li>
+                    <span className="glyph" aria-hidden="true">✓</span>
+                    <span>Act until <span className="num">{fmtDate(mandate.expiry)}</span>, or until the owner revokes</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="withheld">
+                <h3><span className="tag">Withheld</span> The keeper may not</h3>
+                <ul>
+                  <li>
+                    <span className="glyph" aria-hidden="true">—</span>
+                    <span>Withdraw liquidity<small>No function accepts an action list. There is nothing to send.</small></span>
+                  </li>
+                  <li>
+                    <span className="glyph" aria-hidden="true">—</span>
+                    <span>Choose where anything goes<small>The recipient is a constant in code, not a parameter.</small></span>
+                  </li>
+                  <li>
+                    <span className="glyph" aria-hidden="true">—</span>
+                    <span>Swap, move range, or touch another position<small>Only <code>compound(id, minFee)</code> exists.</small></span>
+                  </li>
+                  <li>
+                    <span className="glyph" aria-hidden="true">—</span>
+                    <span>Keep acting after the position is sold<small>Every call checks <code>ownerOf == grantor</code>.</small></span>
+                  </li>
+                  <li>
+                    <span className="glyph" aria-hidden="true">—</span>
+                    <span>Change any of the above<small>No admin, no upgrade path, no <code>delegatecall</code> in the bytecode.</small></span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="attest">
+              <span className="verdict">
+                <span aria-hidden="true">{reason === null ? "·" : allowedNow ? "●" : "○"}</span>
+                <span>
+                  Right now the keeper{" "}
+                  <b>{reason === null ? "…" : allowedNow ? "may act" : "may not act"}</b>
+                  {reason && !allowedNow && <> — {REFUSAL_REASONS[reason] ?? `unknown reason ${reason}`}</>}
+                </span>
+              </span>
+              <span>
+                Read from <code>canCompound()</code>; a revert would discard any explanatory event, so
+                the reason is returned by a view.
+              </span>
+            </div>
+          </article>
         )}
       </section>
 
-      <section className="panel">
-        <h2>Readable without us — {mandate ? `${mandate.tokenId}.${ENS_PARENT}` : ENS_PARENT}</h2>
-        <p className="small muted" style={{marginTop: -6}}>
-          Resolved through the ENSv2 resolver, not copied from the values above. Anyone can
-          read this in any ENS client without visiting this page or trusting it.
-        </p>
-        {!ens && <p className="muted">Resolving…</p>}
-        {ens && (
-          <div className="grid2">
-            <table>
-              <tbody>
-                {Object.entries(ens.records)
-                  .filter(([k]) => k !== KEEPER_KEY)
-                  .map(([k, v]) => (
-                    <tr key={k}>
-                      <td className="mono">{k}</td>
-                      <td className="mono">{v || <span className="muted">—</span>}</td>
+      {/* 3 ── proof */}
+      <section className="section" aria-labelledby="s3">
+        <div className="section-head">
+          <span className="n" aria-hidden="true">2</span>
+          <h2 id="s3">What the keeper actually did</h2>
+          <p>Every <code>MandateExecuted</code> event this mandate has emitted on Sepolia.</p>
+        </div>
+
+        {!error && execs === null && <p className="pending">Reading execution logs from both RPC operators…</p>}
+        {execs !== null && execs.length === 0 && <p className="pending">No executions yet.</p>}
+        {execs !== null && execs.length > 0 && (
+          <>
+            <div className="stats">
+              <div className="stat">
+                <div className="label">Compounds</div>
+                <div className="value">{execs.length}</div>
+                <div className="note">each one triggered by the keeper's key</div>
+              </div>
+              <div className="stat">
+                <div className="label">Liquidity added to the owner's position</div>
+                <div className="value accent" title={`+${fmtLiq(liqAdded)}`}>+{fmtLiqShort(liqAdded)}</div>
+                <div className="note">no swap; sized from harvested fees only</div>
+              </div>
+              <div className="stat">
+                <div className="label">Liquidity taken by the keeper</div>
+                <div className="value">0</div>
+                <div className="note">not blocked by a check — no call exists that could</div>
+              </div>
+            </div>
+
+            <div className="ledger-wrap">
+              <table className="ledger">
+                <caption className="visually-hidden">Executions of mandate {DEMO_MANDATE_ID.toString()}</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Block</th>
+                    <th scope="col">Liquidity added</th>
+                    <th scope="col">Fee to keeper (token0 / token1)</th>
+                    <th scope="col">Liquidity to keeper</th>
+                    <th scope="col">Transaction</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {execs.map((e) => (
+                    <tr key={e.txHash}>
+                      <td className="num">{e.block.toString()}</td>
+                      <td className="num">+{fmtLiq(e.liquidityAdded)}</td>
+                      <td className="num">{fmtLiq(e.fee0Paid)} / {fmtLiq(e.fee1Paid)}</td>
+                      <td className="num zero">0</td>
+                      <td>{link(`tx/${e.txHash}`, short(e.txHash))}</td>
                     </tr>
                   ))}
-              </tbody>
-            </table>
-            <div className="cmp">
-              <h3 style={{fontSize: 13, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".06em"}}>
-                The one key the keeper may write
-              </h3>
-              <p className="mono" style={{margin: "8px 0 4px"}}>
-                {KEEPER_KEY} = {ens.records[KEEPER_KEY] || "—"}
-              </p>
-              <p className="small muted" style={{marginBottom: 0}}>
-                The bot writes this itself after each run. The identical call aimed at{" "}
-                <code>envoyage:maxFeeBps</code> reverts <code>EACUnauthorizedAccountRoles</code> —
-                so it can report what it did, and cannot rewrite what it is allowed to do.
-              </p>
+                </tbody>
+              </table>
             </div>
-          </div>
-        )}
-      </section>
-
-      <section className="panel">
-        <h2>What the keeper actually did</h2>
-        {execs.length === 0 && <p className="muted">No executions indexed yet.</p>}
-        {rows.length > 0 && (
-          <p className="small muted" style={{marginTop: -6}}>
-            {rows[0].executionCount} execution{rows[0].executionCount === 1 ? "" : "s"} indexed ·
-            fee cap {(rows[0].maxFeeBps / 100).toFixed(2)}% · cooldown {rows[0].minInterval}s
-          </p>
-        )}
-        {execs.length > 0 && (
-          <>
-            <p className="big">
-              +<span className="delta">{formatUnits(execs.reduce((a, e) => a + e.liquidityAdded, 0n), 18)}</span>{" "}
-              <span className="muted" style={{fontSize: 15}}>liquidity added</span>
+            <p className="census-foot">
+              Totals: {fmtLiq(fee0)} token0 and {fmtLiq(fee1)} token1 to the keeper — the capped share of
+              harvested fees. Envoyage's own balance is zero after every transaction.
             </p>
-            <table style={{marginTop: 10}}>
-              <tbody>
-                <tr>
-                  <td>Executions</td>
-                  <td>{execs.length}</td>
-                </tr>
-                <tr>
-                  <td>Fees taken by keeper</td>
-                  <td className="mono">
-                    {formatUnits(execs.reduce((a, e) => a + e.fee0Paid, 0n), 18)} /{" "}
-                    {formatUnits(execs.reduce((a, e) => a + e.fee1Paid, 0n), 18)}
-                  </td>
-                </tr>
-                <tr>
-                  <td>Liquidity taken by keeper</td>
-                  <td>
-                    <span className="pill ok">0</span>{" "}
-                    <span className="small muted">no action exists that could</span>
-                  </td>
-                </tr>
-                {execs.map((e) => (
-                  <tr key={e.txHash}>
-                    <td>Block {e.block.toString()}</td>
-                    <td>{link(`tx/${e.txHash}`, short(e.txHash))}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </>
         )}
       </section>
 
-      <section className="panel">
-        <h2>Where this page gets its numbers</h2>
-        <div className="grid2">
-          <div className="cmp">
-            <h3>Envoyage subgraph · Subgraph Studio</h3>
-            <p className="sub">Mandate scope, execution history, and the approval census</p>
-            <p className="small muted" style={{marginBottom: 0}}>
-              Also the keeper&rsquo;s work list: the bot asks this subgraph which mandates name
-              it and which has gone longest without service. Remove it and the bot has nothing
-              to do.
+      {/* 4 ── verify */}
+      <section className="section" aria-labelledby="s4">
+        <div className="section-head">
+          <span className="n" aria-hidden="true">3</span>
+          <h2 id="s4">Anyone can verify it</h2>
+          <p>The scope is published as ENS text records. These values are resolved through the ENS resolver, not copied from the contract above.</p>
+        </div>
+
+        <div className="ens">
+          <div>
+            <div className="ens-name">
+              {mandate?.tokenId.toString() ?? "…"}.<span className="tld">{ENS_PARENT}</span>
+            </div>
+            <p>
+              A subname per position. Paste it into any ENS client and the mandate's terms come back
+              as text records — no Envoyage software required. The keeper holds write access to
+              exactly one key, <code>{KEEPER_KEY}</code>; writing to any other record fails with{" "}
+              <code>EACUnauthorizedAccountRoles</code>.
             </p>
           </div>
-          <div className="cmp">
-            <h3>Uniswap v4 subgraph · decentralized network</h3>
-            <p className="sub">The size of the population the problem applies to</p>
-            <p className="small muted" style={{marginBottom: 0}}>
-              Uniswap&rsquo;s subgraph knows how many positions exist and who holds them, and has
-              no concept of a permission scope — an approval carries none. Ours knows exactly
-              what each keeper may do. Neither answers the question alone.
-            </p>
+
+          <div className="records">
+            {!ens && !error && <p className="pending" style={{padding: "12px 16px"}}>Resolving records…</p>}
+            {ens && (
+              <dl>
+                {Object.entries(ens.records).map(([k, v]) => (
+                  <div key={k}>
+                    <dt>{k}</dt>
+                    <dd className={k === KEEPER_KEY ? "writable" : undefined}>
+                      {v || <span className="pending">(unset)</span>}
+                      {k === KEEPER_KEY && <span className="writable-note">the one record the keeper may write</span>}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
           </div>
         </div>
-        <p className="small muted" style={{marginBottom: 0}}>
-          Contract state and refusal reasons still come straight from Sepolia over two
-          independent RPC operators, so the page renders even if an indexer is behind.
-        </p>
       </section>
 
-      <footer>
-        Composed from two Graph products plus direct chain reads. No backend.
-        <br />
+      {/* 5 ── why it matters */}
+      <section className="section" aria-labelledby="s5">
+        <div className="section-head">
+          <span className="n" aria-hidden="true">4</span>
+          <h2 id="s5">Why it matters</h2>
+          <p>A census of every live delegation on Uniswap v4's PositionManager, Sepolia, indexed by our subgraph.</p>
+        </div>
+
+        {graphError && (
+          <div className="error" role="alert">
+            <b>Subgraph query failed.</b>
+            <span>Figures are withheld rather than shown as zero. <code>{graphError}</code></span>
+          </div>
+        )}
+        {!census && !graphError && <p className="pending">Reading the subgraph…</p>}
+
+        {census && (
+          <>
+            <div className="census">
+              <div>
+                <div className="figure num">{unbounded}</div>
+                <p className="caption">
+                  <strong>unbounded delegations</strong> — {census.activeBlanketApprovals} via{" "}
+                  <code>setApprovalForAll</code>, {census.activeUnscopedApprovals} single-position approvals.
+                  Each one can withdraw everything it covers.
+                </p>
+              </div>
+              <div className="vs" aria-hidden="true">against</div>
+              <div className="scoped">
+                <div className="figure num">{scoped}</div>
+                <p className="caption">
+                  <strong>scoped</strong> — Envoyage mandates, each limited to <code>compound</code> with a capped fee, a cooldown and an expiry.
+                </p>
+              </div>
+            </div>
+            <p className="census-foot">
+              {census.distinctDelegates} distinct delegates hold those approvals, across{" "}
+              {census.totalApprovalEvents} approval events since indexing began
+              {indexedBlock ? ` · indexed to block ${indexedBlock}` : ""}.
+              {scale && (
+                <> On Ethereum mainnet, Uniswap v4 has {Number(scale.pools).toLocaleString()} pools and{" "}
+                {Number(scale.txCount).toLocaleString()} transactions; every position there that wants
+                automation has only an unbounded approval to offer it.</>
+              )}
+            </p>
+          </>
+        )}
+      </section>
+
+      {/* 6 ── sources */}
+      <section className="section" aria-labelledby="s6">
+        <div className="section-head">
+          <span className="n" aria-hidden="true">5</span>
+          <h2 id="s6">Where the numbers come from</h2>
+          <p>Two Graph products, composed. Neither answers the question alone.</p>
+        </div>
+        <div className="sources">
+          <div className="source">
+            <h3>Envoyage subgraph — Subgraph Studio</h3>
+            <p>Mandates, executions, and the census of approvals on the PositionManager. Knows exactly what each keeper may do; knows nothing about the wider population.</p>
+            <div className="meta">api.studio.thegraph.com/query/62788/envoyage/v0.0.4</div>
+          </div>
+          <div className="source">
+            <h3>Uniswap v4 subgraph — The Graph Network</h3>
+            <p>Pools, positions and owners on mainnet, via the Gateway. Knows how large the exposed population is; has no concept of a permission scope, because an approval does not carry one.</p>
+            <div className="meta">
+              {scale && "reached via gateway.thegraph.com"}
+              {!scale && scaleError && <>gateway query failed — figures withheld rather than shown as zero. {scaleError.slice(0, 160)}{scaleError.length > 160 ? "…" : ""}</>}
+              {!scale && !scaleError && !import.meta.env.VITE_GRAPH_GATEWAY_KEY && "not queried — no VITE_GRAPH_GATEWAY_KEY in this build"}
+              {!scale && !scaleError && import.meta.env.VITE_GRAPH_GATEWAY_KEY && "querying gateway.thegraph.com…"}
+            </div>
+          </div>
+        </div>
+        {rows.length > 1 && (
+          <p className="census-foot">{rows.length} mandates indexed in total.</p>
+        )}
+      </section>
+
+      <footer className="foot">
+        <span>Chain state read directly from Sepolia over two independent RPC operators.</span>
         <a href="https://github.com/envoyage-protocol/envoyage">github.com/envoyage-protocol/envoyage</a>
       </footer>
     </div>
