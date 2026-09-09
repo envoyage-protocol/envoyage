@@ -8,10 +8,16 @@ export const POSITION_MANAGER = "0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4" as 
 
 /// Two operators, not two endpoints from one. A single provider's keys share a
 /// failure domain, so a fallback across them never actually fails over.
+///
+/// Order matters: viem's fallback tries these in sequence and only moves on when a
+/// call ERRORS. A keyed operator goes first because public ones rate-limit browsers.
+/// 1rpc.io was removed on 9 Sept: it dropped Sepolia from its free tier and, before
+/// saying so, spent a day returning empty results with HTTP 200 — an operator that
+/// answers wrongly is worse than one that fails, because a fallback cannot see it.
 export const RPC_URLS = [
-  "https://ethereum-sepolia-rpc.publicnode.com",
-  "https://1rpc.io/sepolia"
-];
+  import.meta.env.VITE_SEPOLIA_RPC_URL as string | undefined,
+  "https://ethereum-sepolia-rpc.publicnode.com"
+].filter((u): u is string => !!u);
 
 export const EXPLORER = "https://sepolia.etherscan.io";
 

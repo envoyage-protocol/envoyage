@@ -6,13 +6,12 @@ import {
   readMandate,
   readCanCompound,
   readPositionOwner,
-  readExecutionsAudit,
-  type OperatorReport,
+  verifyExecutionReceipts,
+  type ReceiptCheck,
   // kept only as an independent cross-check of the subgraph, not to render the ledger
   readEnsScope,
   REFUSAL_REASONS,
-  type Mandate,
-  type Execution
+  type Mandate
 } from "../lib/envoyage";
 
 const short = (a: string) => a.slice(0, 6) + "…" + a.slice(-4);
@@ -28,8 +27,7 @@ export function Overview() {
   const [pos, setPos] = useState<{owner: string; approved: string} | null>(null);
   // null until the chain has answered. An empty array would render "no executions"
   // while the read is still in flight — a pending state shown as an empty fact.
-  const [execs, setExecs] = useState<Execution[] | null>(null);
-  const [operators, setOperators] = useState<OperatorReport[] | null>(null);
+  const [receipts, setReceipts] = useState<ReceiptCheck[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [census, setCensus] = useState<Census | null>(null);
@@ -57,15 +55,9 @@ export function Overview() {
       try {
         const m = await readMandate(DEMO_MANDATE_ID);
         setMandate(m);
-        const [r, p, e] = await Promise.all([
-          readCanCompound(DEMO_MANDATE_ID),
-          readPositionOwner(m.tokenId),
-          readExecutionsAudit(DEMO_MANDATE_ID)
-        ]);
+        const [r, p] = await Promise.all([readCanCompound(DEMO_MANDATE_ID), readPositionOwner(m.tokenId)]);
         setReason(r);
         setPos(p);
-        setExecs(e.executions);
-        setOperators(e.operators);
 
         // ENS is read through the resolver, not reused from the values above, so what
         // is shown here is what a stranger's ENS client would get.
@@ -88,6 +80,10 @@ export function Overview() {
         setRows(d.mandates);
         setIndexedBlock(d.indexedBlock);
         setGraphExecs(d.executions);
+        // Chain audit of the subgraph's own rows: one receipt per execution.
+        verifyExecutionReceipts(d.executions.map((e) => e.tx as `0x${string}`))
+          .then(setReceipts)
+          .catch(() => setReceipts(null));
       })
       .catch((e) => setGraphError(e instanceof Error ? e.message : String(e)));
 
@@ -111,16 +107,17 @@ export function Overview() {
   const liqAdded = sum(gx.map((e) => BigInt(e.liquidityAdded)));
   const fee0 = sum(gx.map((e) => BigInt(e.fee0ToKeeper)));
   const fee1 = sum(gx.map((e) => BigInt(e.fee1ToKeeper)));
-  // The chain cross-check, phrased per operator. "0 on RPC" printed as a bare number
-  // reads as a discrepancy with the subgraph; per-operator it reads as what it is —
-  // one node down and one node wrong — which is the finding, not a contradiction.
-  const rpcCount = execs?.length ?? null;
-  const countMatches = rpcCount !== null && graphExecs !== null && rpcCount === graphExecs.length;
+  // Chain audit phrased as what was checked: each indexed transaction's receipt.
   const crossCheck = (() => {
-    if (!operators || graphExecs === null) return null;
-    if (countMatches) return `Cross-checked against the chain: ${rpcCount} events over ${operators.filter((o) => o.status === "ok").length} RPC operator(s), matches.`;
-    const detail = operators.map((o) => `${o.host} ${o.status === "ok" ? `returned ${o.count}` : "failed"}`).join("; ");
-    return `Chain cross-check inconclusive — ${detail}. The subgraph indexes from its own node and is the record here.`;
+    if (!receipts || graphExecs === null) return null;
+    const ok = receipts.filter((r) => r.result === "confirmed").length;
+    const bad = receipts.filter((r) => r.result === "mismatch").length;
+    const down = receipts.filter((r) => r.result === "unreachable").length;
+    if (ok === receipts.length) return `Each of the ${ok} indexed transactions was confirmed against its own receipt on Sepolia.`;
+    const parts = [`${ok} of ${receipts.length} confirmed by receipt`];
+    if (bad) parts.push(`${bad} receipt(s) do not match the subgraph — a real discrepancy`);
+    if (down) parts.push(`${down} receipt(s) unreachable on the RPC right now`);
+    return parts.join("; ") + ".";
   })();
 
   const unbounded = census ? census.activeBlanketApprovals + census.activeUnscopedApprovals : null;

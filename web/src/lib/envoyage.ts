@@ -4,6 +4,8 @@ import {
   fallback,
   parseAbiItem,
   toFunctionSelector,
+  keccak256,
+  toBytes,
   type Address,
   type Hex
 } from "viem";
@@ -215,6 +217,37 @@ export async function readExecutions(id: bigint): Promise<Execution[]> {
   return executions;
 }
 
+
+/// Confirms each subgraph-reported execution against its own transaction receipt.
+///
+/// Replaces a getLogs-based count as the chain cross-check. Counting logs over the
+/// contract's whole history proved unworkable in practice: Alchemy's free tier caps
+/// eth_getLogs at a 10-block range, 1rpc.io dropped Sepolia from its free tier and
+/// returned empty results for a day before saying so, and publicnode answered the
+/// browser differently from curl. Receipts are per-hash and deterministic — every
+/// tier serves them, and there is no range for an operator to quietly truncate.
+///
+/// A row is confirmed only if the receipt succeeded AND contains a MandateExecuted
+/// log emitted by Envoyage. A receipt that is reachable but does not match is a
+/// finding about the subgraph, and is reported as such rather than hidden.
+export type ReceiptCheck = {txHash: Hex; result: "confirmed" | "mismatch" | "unreachable"};
+
+export async function verifyExecutionReceipts(txHashes: Hex[]): Promise<ReceiptCheck[]> {
+  const topic0 = keccak256(toBytes("MandateExecuted(uint256,uint256,uint256,uint128)"));
+  return Promise.all(
+    txHashes.map(async (txHash): Promise<ReceiptCheck> => {
+      try {
+        const r = await publicClient.getTransactionReceipt({hash: txHash});
+        const emitted = r.logs.some(
+          (l) => l.address.toLowerCase() === ENVOYAGE.toLowerCase() && l.topics[0] === topic0
+        );
+        return {txHash, result: r.status === "success" && emitted ? "confirmed" : "mismatch"};
+      } catch {
+        return {txHash, result: "unreachable"};
+      }
+    })
+  );
+}
 
 /// Reads the mandate's scope back out of ENS, the way any third party would.
 ///
