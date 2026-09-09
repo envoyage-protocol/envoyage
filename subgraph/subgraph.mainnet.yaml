@@ -1,0 +1,36 @@
+specVersion: 1.0.0
+description: >-
+  Census of every delegation ever granted on Uniswap v4's PositionManager on
+  Ethereum mainnet: who holds unbounded authority over whose positions. Same
+  handler as the Sepolia deployment, pointed at real money.
+repository: https://github.com/envoyage-protocol/envoyage
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: PositionManager
+    network: mainnet
+    source:
+      # Uniswap v4 PositionManager, Ethereum mainnet. Creation block read from the
+      # contract-creation receipt via Etherscan, not guessed.
+      address: "0xbD216513d74C8cf14cf4747E6AaA6420FF64ee9e"
+      abi: PositionManager
+      startBlock: 21689089
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      file: ./src/census.ts
+      entities:
+        - Delegate
+        - BlanketApproval
+        - PositionApproval
+        - Census
+      abis:
+        - name: PositionManager
+          file: ./abis/PositionManager.json
+      eventHandlers:
+        - event: ApprovalForAll(indexed address,indexed address,bool)
+          handler: handleApprovalForAll
+        - event: Approval(indexed address,indexed address,indexed uint256)
+          handler: handleApproval

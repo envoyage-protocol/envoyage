@@ -4,6 +4,9 @@ import {Delegate, BlanketApproval, PositionApproval, Census} from "../generated/
 
 /// The Envoyage deployment. An approval pointing here is scoped; one pointing anywhere
 /// else is not, and that single comparison is the whole point of this data source.
+// Envoyage on Sepolia. On the mainnet deployment of this same handler nothing
+// matches, so activeScopedApprovals is 0 there — which is the true figure: no
+// scoped alternative exists on mainnet yet. That zero is the point of the census.
 const ENVOYAGE = "0x8466e82e02edf3f00c0387d5c3e66d407dc7259c";
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
 const CENSUS_ID = "census";
