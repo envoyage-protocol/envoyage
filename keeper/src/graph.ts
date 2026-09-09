@@ -14,7 +14,7 @@
  */
 
 const ENDPOINT =
-  process.env.SUBGRAPH_URL ?? "https://api.studio.thegraph.com/query/62788/envoyage/v0.0.2";
+  process.env.SUBGRAPH_URL ?? "https://api.studio.thegraph.com/query/62788/envoyage/v0.0.4";
 
 export type Work = {
   mandateId: bigint;

@@ -144,7 +144,7 @@ Replace with the demo video URL before final submission.
 | | |
 |---|---|
 | Envoyage (verified) | `https://sepolia.etherscan.io/address/0x8466e82E02edF3F00c0387D5C3E66d407dc7259C#code` |
-| Subgraph | `https://api.studio.thegraph.com/query/62788/envoyage/v0.0.2` |
+| Subgraph | `https://api.studio.thegraph.com/query/62788/envoyage/v0.0.4` |
 | ENS parent | `envoyage.eth` (ENSv2 Sepolia beta) |
 | ENS mandate name | `38896.envoyage.eth` |
 | EnvoyageNames | `0x307CF6B0022Ef757820A8C3Cfced97C324eE0d05` |

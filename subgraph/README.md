@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Query endpoint | `https://api.studio.thegraph.com/query/62788/envoyage/v0.0.2` |
+| Query endpoint | `https://api.studio.thegraph.com/query/62788/envoyage/v0.0.4` |
 | Studio | https://thegraph.com/studio/subgraph/envoyage |
 | Network | Sepolia, from block 11644424 |
 | Deployment | `QmNsAEPDBLY1TedpzxDUt1Rau4gxKbLjWQknTNWTpHBQHS` |
