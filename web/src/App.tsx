@@ -1,453 +1,76 @@
-import {useEffect, useState} from "react";
-import {formatUnits, type Hex} from "viem";
-import {ENVOYAGE, EXPLORER, DEMO_MANDATE_ID, ENS_PARENT, KEEPER_KEY} from "./lib/config";
-import {fetchEnvoyage, fetchUniswapScale, type Census, type UniswapScale, type MandateRow} from "./lib/graph";
-import {
-  readMandate,
-  readCanCompound,
-  readPositionOwner,
-  readExecutions,
-  readEnsScope,
-  REFUSAL_REASONS,
-  type Mandate,
-  type Execution
-} from "./lib/envoyage";
+import {SessionProvider, useRoute} from "./lib/session";
+import {WalletBar} from "./ui/WalletBar";
+import {Overview} from "./ui/Overview";
+import {Theft} from "./ui/Theft";
+import {KeeperActs} from "./ui/KeeperActs";
+import {ENVOYAGE, EXPLORER} from "./lib/config";
+import {short} from "./ui/kit";
 
-const short = (a: string) => a.slice(0, 6) + "…" + a.slice(-4);
-const link = (path: string, label: string) => (
-  <a href={`${EXPLORER}/${path}`} target="_blank" rel="noreferrer" className="mono">
-    {label}
-  </a>
-);
+function Nav({route, go}: {route: string; go: (r: string) => void}) {
+  const tabs = [
+    ["", "Overview"],
+    ["demo", "Try it live"]
+  ] as const;
+  return (
+    <nav className="tabs">
+      {tabs.map(([r, label]) => (
+        <button key={r} className={route === r ? "tab on" : "tab"} onClick={() => go(r)} aria-current={route === r}>
+          {label}
+        </button>
+      ))}
+    </nav>
+  );
+}
 
-export function App() {
-  const [mandate, setMandate] = useState<Mandate | null>(null);
-  const [reason, setReason] = useState<Hex | null>(null);
-  const [pos, setPos] = useState<{owner: string; approved: string} | null>(null);
-  // null until the chain has answered. An empty array would render "no executions"
-  // while the read is still in flight — a pending state shown as an empty fact.
-  const [execs, setExecs] = useState<Execution[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+function Walkthrough() {
+  return (
+    <div className="walk">
+      <section className="lede" aria-labelledby="w-h">
+        <h1 id="w-h">
+          Don't take our word for it. <em>Perform</em> the attack.
+        </h1>
+        <p>
+          Connect any wallet. Every button below sends a real transaction to Sepolia — the theft that
+          drains a naive contract, the same theft that a mandate has no way to receive, a compound that
+          grows a position, and a revoke that kills the keeper. Nothing here is a fixture or a claim.
+        </p>
+      </section>
+      <Theft />
+      <KeeperActs />
+    </div>
+  );
+}
 
-  const [census, setCensus] = useState<Census | null>(null);
-  const [indexedBlock, setIndexedBlock] = useState<number | null>(null);
-  const [rows, setRows] = useState<MandateRow[]>([]);
-
-  const [scale, setScale] = useState<UniswapScale | null>(null);
-  // Distinguishes "not attempted" from "attempted and failed". Without it a Gateway
-  // outage renders as "no key configured", which blames the wrong thing.
-  const [scaleError, setScaleError] = useState<string | null>(null);
-  const [ens, setEns] = useState<{node: string; records: Record<string, string>} | null>(null);
-  const [graphError, setGraphError] = useState<string | null>(null);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const m = await readMandate(DEMO_MANDATE_ID);
-        setMandate(m);
-        const [r, p, e] = await Promise.all([
-          readCanCompound(DEMO_MANDATE_ID),
-          readPositionOwner(m.tokenId),
-          readExecutions(DEMO_MANDATE_ID)
-        ]);
-        setReason(r);
-        setPos(p);
-        setExecs(e);
-
-        // ENS is read through the resolver, not reused from the values above, so what
-        // is shown here is what a stranger's ENS client would get.
-        readEnsScope(m.tokenId).then(setEns).catch(() => {});
-      } catch (err) {
-        // Surfaced rather than swallowed. An empty page that silently failed to read
-        // the chain looks identical to a page with nothing to show.
-        setError(err instanceof Error ? err.message : String(err));
-      }
-    })();
-
-    // The two Graph sources load independently of the chain reads, so a slow or
-    // failing indexer never blanks the parts that come straight from Sepolia.
-    fetchEnvoyage()
-      .then((d) => {
-        setCensus(d.census);
-        setRows(d.mandates);
-        setIndexedBlock(d.indexedBlock);
-      })
-      .catch((e) => setGraphError(e instanceof Error ? e.message : String(e)));
-
-    fetchUniswapScale()
-      .then(setScale)
-      .catch((e) => setScaleError(e instanceof Error ? e.message : String(e)));
-  }, []);
-
-
-  // ── derived ───────────────────────────────────────────────────────────────
-  const revoked = mandate !== null && mandate.keeper === "0x0000000000000000000000000000000000000000";
-  const approvedToEnvoyage = pos?.approved.toLowerCase() === ENVOYAGE.toLowerCase();
-  const allowedNow = reason === "0x00000000";
-
-  const sum = (xs: bigint[]) => xs.reduce((a, b) => a + b, 0n);
-  const liqAdded = sum((execs ?? []).map((e) => e.liquidityAdded));
-  const fee0 = sum((execs ?? []).map((e) => e.fee0Paid));
-  const fee1 = sum((execs ?? []).map((e) => e.fee1Paid));
-
-  const unbounded = census ? census.activeBlanketApprovals + census.activeUnscopedApprovals : null;
-  const scoped = census ? census.activeScopedApprovals : null;
-
-  const fmtDate = (t: bigint) =>
-    t === 0n ? "—" : new Date(Number(t) * 1000).toISOString().slice(0, 10);
-  const fmtLiq = (v: bigint) => formatUnits(v, 18);
-  // Headline figures are rounded so a 20-digit value never has to wrap; the ledger
-  // below carries every digit, so nothing is lost — only moved.
-  const fmtLiqShort = (v: bigint) => Number(formatUnits(v, 18)).toFixed(6);
-
+function Shell() {
+  const [route, go] = useRoute();
   return (
     <div className="page">
       <header className="masthead">
-        <div className="brand">
-          <img src="/logo.png" alt="" width={44} />
+        <button className="brand" onClick={() => go("")} aria-label="Envoyage home">
+          <img src="/logo.png" alt="" width={40} />
           <span>Envoyage</span>
+        </button>
+        <div className="masthead-right">
+          <Nav route={route} go={go} />
+          <p className="chain">
+            <span className="dot" aria-hidden="true" /> Sepolia ·{" "}
+            <a className="mono" href={`${EXPLORER}/address/${ENVOYAGE}#code`} target="_blank" rel="noreferrer">
+              {short(ENVOYAGE)}
+            </a>
+          </p>
+          <WalletBar />
         </div>
-        <p className="chain">
-          <span className="dot" aria-hidden="true" />
-          Sepolia · {link(`address/${ENVOYAGE}#code`, short(ENVOYAGE))} · verified source
-        </p>
       </header>
 
-      {/* 1 ── what this is, before any number */}
-      <section className="lede" aria-labelledby="lede-h">
-        <h1 id="lede-h">
-          A keeper that can <em>grow</em> your position and do nothing else with it.
-        </h1>
-        <p>
-          On Uniswap v4, the only way to let a bot compound your fees is{" "}
-          <code>approve(keeper, tokenId)</code> — which says <strong>which</strong> position it may
-          touch and nothing about <strong>what</strong> it may do. An approved bot can withdraw
-          the liquidity and send it to itself. Envoyage replaces that with a{" "}
-          <strong>mandate</strong>: the bot passes two numbers, and the contract writes the
-          Uniswap instructions itself, with the destination fixed in code.
-        </p>
-      </section>
-
-      {/* 2 ── the instrument */}
-      <section className="section" aria-labelledby="s2">
-        <div className="section-head">
-          <span className="n" aria-hidden="true">1</span>
-          <h2 id="s2">The mandate</h2>
-          <p>What this keeper may do to position #{mandate?.tokenId.toString() ?? "…"}, and what it may not. Read live from the contract.</p>
-        </div>
-
-        {error && (
-          <div className="error" role="alert">
-            <b>Could not read Sepolia.</b>
-            <span>
-              Nothing below this line is shown until the chain answers. <code>{error}</code>
-            </span>
-          </div>
-        )}
-        {!mandate && !error && <p className="pending">Reading the mandate from Sepolia…</p>}
-
-        {mandate && (
-          <article className="instrument" aria-label={`Mandate ${DEMO_MANDATE_ID}`}>
-            <div className="instrument-top">
-              <div className="instrument-title">
-                Mandate №{DEMO_MANDATE_ID.toString()}
-                <small>
-                  Limited authority over Uniswap v4 position #{mandate.tokenId.toString()} · granted{" "}
-                  by its owner · {revoked ? "revoked" : `valid until ${fmtDate(mandate.expiry)}`}
-                </small>
-              </div>
-              {revoked ? (
-                <span className="seal off">Revoked</span>
-              ) : (
-                <span className="seal">In force</span>
-              )}
-            </div>
-
-            <dl className="parties">
-              <div className="party">
-                <dt>Granted by</dt>
-                <dd>{link(`address/${mandate.grantor}`, short(mandate.grantor))} <span className="pending">— the position's owner</span></dd>
-              </div>
-              <div className="party">
-                <dt>Granted to</dt>
-                <dd>{link(`address/${mandate.keeper}`, short(mandate.keeper))} <span className="pending">— the keeper</span></dd>
-              </div>
-              <div className="party">
-                <dt>Authority held by</dt>
-                <dd>
-                  {pos ? (
-                    approvedToEnvoyage ? (
-                      <>Envoyage <span className="pending">— never the keeper</span></>
-                    ) : (
-                      link(`address/${pos.approved}`, short(pos.approved))
-                    )
-                  ) : (
-                    <span className="pending">reading…</span>
-                  )}
-                </dd>
-              </div>
-            </dl>
-
-            <div className="powers">
-              <div className="permitted">
-                <h3><span className="tag">Permitted</span> The keeper may</h3>
-                <ul>
-                  <li>
-                    <span className="glyph" aria-hidden="true">✓</span>
-                    <span>Call <strong>compound</strong> — harvest fees and reinvest them into this position</span>
-                  </li>
-                  <li>
-                    <span className="glyph" aria-hidden="true">✓</span>
-                    <span>
-                      Keep at most <span className="num">{(mandate.maxFeeBps / 100).toFixed(2)}%</span> of the{" "}
-                      <strong>fees harvested</strong> — never of the position
-                    </span>
-                  </li>
-                  <li>
-                    <span className="glyph" aria-hidden="true">✓</span>
-                    <span>Be paid only to {link(`address/${mandate.feeRecipient}`, short(mandate.feeRecipient))}, fixed when the mandate was granted</span>
-                  </li>
-                  <li>
-                    <span className="glyph" aria-hidden="true">✓</span>
-                    <span>Act no more than once every <span className="num">{mandate.minInterval.toString()}s</span></span>
-                  </li>
-                  <li>
-                    <span className="glyph" aria-hidden="true">✓</span>
-                    <span>Act until <span className="num">{fmtDate(mandate.expiry)}</span>, or until the owner revokes</span>
-                  </li>
-                </ul>
-              </div>
-
-              <div className="withheld">
-                <h3><span className="tag">Withheld</span> The keeper may not</h3>
-                <ul>
-                  <li>
-                    <span className="glyph" aria-hidden="true">—</span>
-                    <span>Withdraw liquidity<small>No function accepts an action list. There is nothing to send.</small></span>
-                  </li>
-                  <li>
-                    <span className="glyph" aria-hidden="true">—</span>
-                    <span>Choose where anything goes<small>The recipient is a constant in code, not a parameter.</small></span>
-                  </li>
-                  <li>
-                    <span className="glyph" aria-hidden="true">—</span>
-                    <span>Swap, move range, or touch another position<small>Only <code>compound(id, minFee)</code> exists.</small></span>
-                  </li>
-                  <li>
-                    <span className="glyph" aria-hidden="true">—</span>
-                    <span>Keep acting after the position is sold<small>Every call checks <code>ownerOf == grantor</code>.</small></span>
-                  </li>
-                  <li>
-                    <span className="glyph" aria-hidden="true">—</span>
-                    <span>Change any of the above<small>No admin, no upgrade path, no <code>delegatecall</code> in the bytecode.</small></span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-
-            <div className="attest">
-              <span className="verdict">
-                <span aria-hidden="true">{reason === null ? "·" : allowedNow ? "●" : "○"}</span>
-                <span>
-                  Right now the keeper{" "}
-                  <b>{reason === null ? "…" : allowedNow ? "may act" : "may not act"}</b>
-                  {reason && !allowedNow && <> — {REFUSAL_REASONS[reason] ?? `unknown reason ${reason}`}</>}
-                </span>
-              </span>
-              <span>
-                Read from <code>canCompound()</code>; a revert would discard any explanatory event, so
-                the reason is returned by a view.
-              </span>
-            </div>
-          </article>
-        )}
-      </section>
-
-      {/* 3 ── proof */}
-      <section className="section" aria-labelledby="s3">
-        <div className="section-head">
-          <span className="n" aria-hidden="true">2</span>
-          <h2 id="s3">What the keeper actually did</h2>
-          <p>Every <code>MandateExecuted</code> event this mandate has emitted on Sepolia.</p>
-        </div>
-
-        {!error && execs === null && <p className="pending">Reading execution logs from both RPC operators…</p>}
-        {execs !== null && execs.length === 0 && <p className="pending">No executions yet.</p>}
-        {execs !== null && execs.length > 0 && (
-          <>
-            <div className="stats">
-              <div className="stat">
-                <div className="label">Compounds</div>
-                <div className="value">{execs.length}</div>
-                <div className="note">each one triggered by the keeper's key</div>
-              </div>
-              <div className="stat">
-                <div className="label">Liquidity added to the owner's position</div>
-                <div className="value accent" title={`+${fmtLiq(liqAdded)}`}>+{fmtLiqShort(liqAdded)}</div>
-                <div className="note">no swap; sized from harvested fees only</div>
-              </div>
-              <div className="stat">
-                <div className="label">Liquidity taken by the keeper</div>
-                <div className="value">0</div>
-                <div className="note">not blocked by a check — no call exists that could</div>
-              </div>
-            </div>
-
-            <div className="ledger-wrap">
-              <table className="ledger">
-                <caption className="visually-hidden">Executions of mandate {DEMO_MANDATE_ID.toString()}</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Block</th>
-                    <th scope="col">Liquidity added</th>
-                    <th scope="col">Fee to keeper (token0 / token1)</th>
-                    <th scope="col">Liquidity to keeper</th>
-                    <th scope="col">Transaction</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {execs.map((e) => (
-                    <tr key={e.txHash}>
-                      <td className="num">{e.block.toString()}</td>
-                      <td className="num">+{fmtLiq(e.liquidityAdded)}</td>
-                      <td className="num">{fmtLiq(e.fee0Paid)} / {fmtLiq(e.fee1Paid)}</td>
-                      <td className="num zero">0</td>
-                      <td>{link(`tx/${e.txHash}`, short(e.txHash))}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="census-foot">
-              Totals: {fmtLiq(fee0)} token0 and {fmtLiq(fee1)} token1 to the keeper — the capped share of
-              harvested fees. Envoyage's own balance is zero after every transaction.
-            </p>
-          </>
-        )}
-      </section>
-
-      {/* 4 ── verify */}
-      <section className="section" aria-labelledby="s4">
-        <div className="section-head">
-          <span className="n" aria-hidden="true">3</span>
-          <h2 id="s4">Anyone can verify it</h2>
-          <p>The scope is published as ENS text records. These values are resolved through the ENS resolver, not copied from the contract above.</p>
-        </div>
-
-        <div className="ens">
-          <div>
-            <div className="ens-name">
-              {mandate?.tokenId.toString() ?? "…"}.<span className="tld">{ENS_PARENT}</span>
-            </div>
-            <p>
-              A subname per position. Paste it into any ENS client and the mandate's terms come back
-              as text records — no Envoyage software required. The keeper holds write access to
-              exactly one key, <code>{KEEPER_KEY}</code>; writing to any other record fails with{" "}
-              <code>EACUnauthorizedAccountRoles</code>.
-            </p>
-          </div>
-
-          <div className="records">
-            {!ens && !error && <p className="pending" style={{padding: "12px 16px"}}>Resolving records…</p>}
-            {ens && (
-              <dl>
-                {Object.entries(ens.records).map(([k, v]) => (
-                  <div key={k}>
-                    <dt>{k}</dt>
-                    <dd className={k === KEEPER_KEY ? "writable" : undefined}>
-                      {v || <span className="pending">(unset)</span>}
-                      {k === KEEPER_KEY && <span className="writable-note">the one record the keeper may write</span>}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* 5 ── why it matters */}
-      <section className="section" aria-labelledby="s5">
-        <div className="section-head">
-          <span className="n" aria-hidden="true">4</span>
-          <h2 id="s5">Why it matters</h2>
-          <p>A census of every live delegation on Uniswap v4's PositionManager, Sepolia, indexed by our subgraph.</p>
-        </div>
-
-        {graphError && (
-          <div className="error" role="alert">
-            <b>Subgraph query failed.</b>
-            <span>Figures are withheld rather than shown as zero. <code>{graphError}</code></span>
-          </div>
-        )}
-        {!census && !graphError && <p className="pending">Reading the subgraph…</p>}
-
-        {census && (
-          <>
-            <div className="census">
-              <div>
-                <div className="figure num">{unbounded}</div>
-                <p className="caption">
-                  <strong>unbounded delegations</strong> — {census.activeBlanketApprovals} via{" "}
-                  <code>setApprovalForAll</code>, {census.activeUnscopedApprovals} single-position approvals.
-                  Each one can withdraw everything it covers.
-                </p>
-              </div>
-              <div className="vs" aria-hidden="true">against</div>
-              <div className="scoped">
-                <div className="figure num">{scoped}</div>
-                <p className="caption">
-                  <strong>scoped</strong> — Envoyage mandates, each limited to <code>compound</code> with a capped fee, a cooldown and an expiry.
-                </p>
-              </div>
-            </div>
-            <p className="census-foot">
-              {census.distinctDelegates} distinct delegates hold those approvals, across{" "}
-              {census.totalApprovalEvents} approval events since indexing began
-              {indexedBlock ? ` · indexed to block ${indexedBlock}` : ""}.
-              {scale && (
-                <> On Ethereum mainnet, Uniswap v4 has {Number(scale.pools).toLocaleString()} pools and{" "}
-                {Number(scale.txCount).toLocaleString()} transactions; every position there that wants
-                automation has only an unbounded approval to offer it.</>
-              )}
-            </p>
-          </>
-        )}
-      </section>
-
-      {/* 6 ── sources */}
-      <section className="section" aria-labelledby="s6">
-        <div className="section-head">
-          <span className="n" aria-hidden="true">5</span>
-          <h2 id="s6">Where the numbers come from</h2>
-          <p>Two Graph products, composed. Neither answers the question alone.</p>
-        </div>
-        <div className="sources">
-          <div className="source">
-            <h3>Envoyage subgraph — Subgraph Studio</h3>
-            <p>Mandates, executions, and the census of approvals on the PositionManager. Knows exactly what each keeper may do; knows nothing about the wider population.</p>
-            <div className="meta">api.studio.thegraph.com/query/62788/envoyage/v0.0.4</div>
-          </div>
-          <div className="source">
-            <h3>Uniswap v4 subgraph — The Graph Network</h3>
-            <p>Pools, positions and owners on mainnet, via the Gateway. Knows how large the exposed population is; has no concept of a permission scope, because an approval does not carry one.</p>
-            <div className="meta">
-              {scale && "reached via gateway.thegraph.com"}
-              {!scale && scaleError && <>gateway query failed — figures withheld rather than shown as zero. {scaleError.slice(0, 160)}{scaleError.length > 160 ? "…" : ""}</>}
-              {!scale && !scaleError && !import.meta.env.VITE_GRAPH_GATEWAY_KEY && "not queried — no VITE_GRAPH_GATEWAY_KEY in this build"}
-              {!scale && !scaleError && import.meta.env.VITE_GRAPH_GATEWAY_KEY && "querying gateway.thegraph.com…"}
-            </div>
-          </div>
-        </div>
-        {rows.length > 1 && (
-          <p className="census-foot">{rows.length} mandates indexed in total.</p>
-        )}
-      </section>
-
-      <footer className="foot">
-        <span>Chain state read directly from Sepolia over two independent RPC operators.</span>
-        <a href="https://github.com/envoyage-protocol/envoyage">github.com/envoyage-protocol/envoyage</a>
-      </footer>
+      {route === "demo" ? <Walkthrough /> : <Overview />}
     </div>
+  );
+}
+
+export function App() {
+  return (
+    <SessionProvider>
+      <Shell />
+    </SessionProvider>
   );
 }
