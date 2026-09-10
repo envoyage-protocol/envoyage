@@ -6,6 +6,7 @@ import {KeeperActs} from "./ui/KeeperActs";
 import {ConnectPanel} from "./ui/ConnectPanel";
 import {useSession} from "./lib/session";
 import {SACRIFICIAL_MANDATE_ID} from "./lib/config";
+import {Hire} from "./ui/Hire";
 
 /// The walkthrough, preserved as the Proof tab. It targets the sacrificial mandate,
 /// never #1, so the worked example on Home is permanent.
@@ -47,12 +48,12 @@ function Placeholder({title}: {title: string}) {
   );
 }
 
-function Screens(route: string) {
+function Screens(route: string, go: (r: string) => void) {
   switch (route) {
     case "hire":
       return (
         <Gated headline="Hire a keeper" why="Connect the wallet that owns the position. The bot is pre-filled; you set the terms.">
-          <Placeholder title="Hire a keeper" />
+          <Hire go={go} />
         </Gated>
       );
     case "mandates":
@@ -79,7 +80,7 @@ function Screens(route: string) {
 export function App() {
   return (
     <SessionProvider>
-      <Shell render={(route) => Screens(route)} />
+      <Shell render={(route, go) => Screens(route, go)} />
     </SessionProvider>
   );
 }
