@@ -76,36 +76,42 @@ export function KeeperActs({mandateId = DEMO_MANDATE_ID}: {mandateId?: bigint}) 
   return (
     <section className="act-panel" aria-labelledby="keeper-h">
       <header className="act-head">
-        <span className="act-role">The keeper does its job — then the owner ends it</span>
+        <span className="act-role">Exhibit E · The keeper does its job, then the owner ends it</span>
         <h2 id="keeper-h">Compound, then revoke</h2>
-        <p>Mandate №{mandateId.toString()}, live on Sepolia. Switch to the keeper wallet to compound; to the owner wallet to revoke.</p>
+        <p>Mandate No. {mandateId.toString()}, live on Sepolia. Switch to the keeper wallet to compound; to the owner wallet to revoke.</p>
       </header>
 
-      <div className="keeper-status">
-        <div>
-          <span className="label">Position liquidity</span>
-          <span className="value num">{liq === null ? "…" : formatUnits(liq, 18)}</span>
+      <article className="sheet">
+        <div className="docket">
+          <span className="caps">Mandate No. {mandateId.toString()}</span>
+          <span>{revoked ? "revoked" : mandate ? "in force" : "…"}</span>
         </div>
-        <div>
-          <span className="label">Right now the keeper</span>
-          <span className="value">
-            {reason === null ? "…" : allowed ? "may act" : "may not act"}
-            {reason && !allowed && <small> — {REFUSAL_REASONS[reason] ?? `reason ${reason}`}</small>}
-          </span>
+        <div className="keeper-status">
+          <div>
+            <span className="label">Position liquidity</span>
+            <span className="value num">{liq === null ? "…" : formatUnits(liq, 18)}</span>
+          </div>
+          <div>
+            <span className="label">Right now the attorney-in-fact</span>
+            <span className="value">
+              {reason === null ? "…" : allowed ? "may act" : "may not act"}
+              {reason && !allowed && <small>{REFUSAL_REASONS[reason] ?? `reason ${reason}`}</small>}
+            </span>
+          </div>
         </div>
-      </div>
 
-      <div className="keeper-actions">
-        <div>
-          <ActionButton label="Compound now (as the keeper)" tone="primary" state={compState} onClick={runCompound} disabled={!client || revoked} />
-          <Outcome state={compState} />
+        <div className="keeper-actions">
+          <div>
+            <ActionButton label="Compound now (as the keeper)" tone="primary" state={compState} onClick={runCompound} disabled={!client || revoked} />
+            <Outcome state={compState} />
+          </div>
+          <div>
+            <ActionButton label="Revoke this mandate (as the owner)" tone="default" state={revState} onClick={runRevoke} disabled={!client || revoked} />
+            <Outcome state={revState} />
+          </div>
         </div>
-        <div>
-          <ActionButton label="Revoke this mandate (as the owner)" tone="default" state={revState} onClick={runRevoke} disabled={!client || revoked} />
-          <Outcome state={revState} />
-        </div>
-      </div>
-      {!client && <p className="pending">Connect a wallet to act.</p>}
+        {!client && <p className="pending" style={{marginTop: 16}}>Connect a wallet to act.</p>}
+      </article>
     </section>
   );
 }
