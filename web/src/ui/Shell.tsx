@@ -1,0 +1,82 @@
+import {useEffect, useRef, type ReactNode} from "react";
+import {useRoute, useSession} from "../lib/session";
+import {fetchMandatesByGrantor} from "../lib/graph";
+import {ENVOYAGE, EXPLORER} from "../lib/config";
+import {WalletBar} from "./WalletBar";
+import {NetworkBanner} from "./NetworkBanner";
+import {short} from "./kit";
+
+export const ROUTES = [
+  ["", "Home"],
+  ["hire", "Hire a keeper"],
+  ["mandates", "My mandates"],
+  ["bot", "Bot"],
+  ["lookup", "Lookup"],
+  ["demo", "Proof"]
+] as const;
+export type Route = (typeof ROUTES)[number][0];
+
+function Nav({route, go}: {route: string; go: (r: string) => void}) {
+  return (
+    <nav className="tabs" aria-label="Sections">
+      {ROUTES.map(([r, label]) => (
+        <button key={r} className={route === r ? "tab on" : "tab"} onClick={() => go(r)} aria-current={route === r ? "page" : undefined}>
+          {label}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+/// Letterhead, nav, wallet, network banner — and the landing rule: a wallet that
+/// already holds mandates lands on My mandates, once per account, only from Home.
+export function Shell({render}: {render: (route: string, go: (r: string) => void) => ReactNode}) {
+  const [route, go] = useRoute();
+  const {account} = useSession();
+  const redirected = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!account || redirected.current === account) return;
+    redirected.current = account;
+    if (route !== "") return;
+    fetchMandatesByGrantor(account)
+      .then((d) => {
+        if (d.mandates.length > 0 && window.location.hash.replace(/^#\/?/, "") === "") go("mandates");
+      })
+      .catch(() => {
+        /* the subgraph being down must not block landing */
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account]);
+
+  return (
+    <div className="page">
+      <a className="skip" href="#main">
+        Skip to content
+      </a>
+      <header className="masthead">
+        <button className="brand" onClick={() => go("")} aria-label="Envoyage home">
+          <span className="plate" aria-hidden="true">
+            <img src="/logo.png" alt="" width={32} height={32} />
+          </span>
+          <span className="word">
+            Envoyage
+            <small>Scoped keeper mandates · Uniswap v4</small>
+          </span>
+        </button>
+        <div className="masthead-right">
+          <Nav route={route} go={go} />
+          <p className="chain">
+            <span className="dot" aria-hidden="true" /> Sepolia ·{" "}
+            <a className="mono" href={`${EXPLORER}/address/${ENVOYAGE}#code`} target="_blank" rel="noreferrer">
+              {short(ENVOYAGE)}
+            </a>
+          </p>
+          <WalletBar />
+        </div>
+      </header>
+      <NetworkBanner />
+      <main id="main">{render(route, go)}</main>
+    </div>
+  );
+}

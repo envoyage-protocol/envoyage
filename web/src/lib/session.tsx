@@ -1,6 +1,7 @@
 import {createContext, useContext, useEffect, useState, type ReactNode} from "react";
 import type {Address, WalletClient} from "viem";
 import {connect as walletConnect, hasWallet, onAccountChange} from "./wallet";
+import {CHAIN} from "./config";
 
 type Session = {
   account: Address | null;
@@ -9,6 +10,11 @@ type Session = {
   error: string | null;
   available: boolean;
   connect(): Promise<void>;
+  /// The wallet's current chain, or null before it is known.
+  chainId: number | null;
+  /// True when there is no account yet (nothing to gate) or the wallet is on Sepolia.
+  onSepolia: boolean;
+  switchToSepolia(): Promise<void>;
 };
 
 const Ctx = createContext<Session | null>(null);
@@ -18,6 +24,37 @@ export function SessionProvider({children}: {children: ReactNode}) {
   const [client, setClient] = useState<WalletClient | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [chainId, setChainId] = useState<number | null>(null);
+
+  async function readChain() {
+    try {
+      const hex = (await window.ethereum?.request({method: "eth_chainId"})) as string | undefined;
+      if (hex) setChainId(parseInt(hex, 16));
+    } catch {
+      /* no wallet, or it refused: stays unknown */
+    }
+  }
+
+  async function switchToSepolia() {
+    try {
+      await window.ethereum?.request({
+        method: "wallet_switchEthereumChain",
+        params: [{chainId: `0x${CHAIN.id.toString(16)}`}]
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+    readChain();
+  }
+
+  useEffect(() => {
+    readChain();
+    const eth = window.ethereum;
+    if (!eth?.on) return;
+    const h = (...a: unknown[]) => setChainId(parseInt(String(a[0]), 16));
+    eth.on("chainChanged", h);
+    return () => eth.removeListener?.("chainChanged", h);
+  }, []);
 
   async function connect() {
     setConnecting(true);
@@ -26,6 +63,7 @@ export function SessionProvider({children}: {children: ReactNode}) {
       const {client, account} = await walletConnect();
       setClient(client);
       setAccount(account);
+      readChain();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -46,7 +84,19 @@ export function SessionProvider({children}: {children: ReactNode}) {
   );
 
   return (
-    <Ctx.Provider value={{account, client, connecting, error, available: hasWallet(), connect}}>
+    <Ctx.Provider
+      value={{
+        account,
+        client,
+        connecting,
+        error,
+        available: hasWallet(),
+        connect,
+        chainId,
+        onSepolia: !account || chainId === null || chainId === CHAIN.id,
+        switchToSepolia
+      }}
+    >
       {children}
     </Ctx.Provider>
   );
