@@ -10,7 +10,7 @@ import {
   positionCurrencies,
   erc20Balance
 } from "../lib/actions";
-import {ActionButton, Outcome, Tx, Addr, type TxState} from "./kit";
+import {ActionButton, Outcome, Tx, Addr, short, type TxState} from "./kit";
 
 const STEAL = 1_000_000_000_000_000_000n; // 1e18 liquidity per press, so the demo re-runs
 
@@ -105,7 +105,7 @@ export function Theft() {
   return (
     <section className="act-panel" aria-labelledby="theft-h">
       <header className="act-head">
-        <span className="act-role hostile">The keeper turns hostile</span>
+        <span className="act-role hostile">Exhibit D · The keeper turns hostile</span>
         <h2 id="theft-h">The same attack, against two contracts</h2>
         <p>
           This is the attack that drained Aperture Finance: the holder of an approval assembles a
@@ -116,23 +116,38 @@ export function Theft() {
       </header>
 
       <div className="duel">
-        <div className="duel-side hostile-side">
-          <h3>NaiveUtils <span className="tag">approved, unbounded</span></h3>
+        <article className="sheet duel-side hostile-side">
+          <div className="docket">
+            <span className="caps">Approval · unbounded</span>
+            <span>{short(NAIVE)}</span>
+          </div>
+          <h3>
+            NaiveUtils
+            <span className="tag">accepts any instruction it is handed</span>
+          </h3>
           <p className="duel-sub">
-            Position <Addr addr={String(NAIVE_VICTIM_TOKEN_ID)} kind="token" /> #{NAIVE_VICTIM_TOKEN_ID.toString()} is
-            approved to <Addr addr={NAIVE} />, exactly as automation contracts ask today. It accepts
-            whatever instruction you hand it.
+            Position #{NAIVE_VICTIM_TOKEN_ID.toString()} is approved to <Addr addr={NAIVE} />, exactly as
+            automation contracts ask today.
           </p>
+          <p className="port">execute(uint256 tokenId, bytes actions) — present</p>
           <ActionButton label="Withdraw the liquidity to my wallet" tone="hostile" state={naiveState} onClick={runNaive} disabled={!ready} />
           <Outcome state={naiveState} />
-        </div>
+        </article>
 
-        <div className="duel-side safe-side">
-          <h3>Envoyage <span className="tag">mandate</span></h3>
+        <article className="sheet duel-side safe-side">
+          <div className="docket">
+            <span className="caps">Mandate · scoped</span>
+            <span>{short(ENVOYAGE)}</span>
+          </div>
+          <h3>
+            Envoyage
+            <span className="tag">writes its own instructions; takes none</span>
+          </h3>
           <p className="duel-sub">
-            The keeper holds a mandate over <Addr addr={ENVOYAGE} />. You send the same calldata. There
-            is no <code>execute(bytes)</code> — the contract writes its own instructions.
+            The keeper holds a mandate registered with <Addr addr={ENVOYAGE} />. You send the same
+            calldata. There is no function to receive it.
           </p>
+          <p className="port absent">execute(uint256 tokenId, bytes actions) — absent</p>
           <div className="duel-actions">
             <button className="act act-ghost" onClick={runPreview} disabled={!thief}>
               Check the ABI first
@@ -141,10 +156,10 @@ export function Theft() {
           </div>
           {preview && <p className="preview mono">{preview}</p>}
           <Outcome state={envState} />
-        </div>
+        </article>
       </div>
 
-      {!ready && <p className="pending">Connect a wallet to run both, from the same account.</p>}
+      {!ready && <p className="pending" style={{marginTop: 16}}>Connect a wallet to run both, from the same account.</p>}
     </section>
   );
 }

@@ -47,8 +47,13 @@ function Shell() {
     <div className="page">
       <header className="masthead">
         <button className="brand" onClick={() => go("")} aria-label="Envoyage home">
-          <img src="/logo.png" alt="" width={40} />
-          <span>Envoyage</span>
+          <span className="plate" aria-hidden="true">
+            <img src="/logo.png" alt="" width={32} height={32} />
+          </span>
+          <span className="word">
+            Envoyage
+            <small>Scoped keeper mandates · Uniswap v4</small>
+          </span>
         </button>
         <div className="masthead-right">
           <Nav route={route} go={go} />
