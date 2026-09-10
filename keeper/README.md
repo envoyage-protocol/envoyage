@@ -53,3 +53,22 @@ so the most common healthy outcome — `FeeBelowMinimum`, meaning fees have not
 accrued yet — was indistinguishable from a real failure. Selectors are derived from
 signatures with `toFunctionSelector`, never written down: hard-coded ones were wrong
 four times out of six elsewhere in this repo.
+
+## Judging-window operations
+
+Two processes must run unattended from Friday until judging ends:
+
+| Process | Does | Without it |
+|---|---|---|
+| `envoyage-keeper` | compounds whatever the subgraph says needs it | nothing ever compounds |
+| `envoyage-swap-loop` | one round-trip swap on the demo pool every 2 min from the deployer key | fresh positions earn nothing; the keeper refuses them forever |
+
+```bash
+cd keeper && npm install
+pm2 start ecosystem.config.cjs && pm2 save
+pm2 logs envoyage-keeper --lines 20
+```
+
+Both read `../.env`. Balances to watch: keeper ≥ 0.005 ETH (warned at start), deployer ≥ 0.01 ETH (the loop pauses below it and says so). One round trip was measured to make `compound(1)` eligible immediately.
+
+Time to first compound for a newly granted mandate ≈ swap cadence (2 min) + keeper poll (30 s) + indexer lag.
