@@ -8,6 +8,7 @@ import {useSession} from "./lib/session";
 import {SACRIFICIAL_MANDATE_ID} from "./lib/config";
 import {Hire} from "./ui/Hire";
 import {MyMandates} from "./ui/MyMandates";
+import {Bot} from "./ui/Bot";
 
 /// The walkthrough, preserved as the Proof tab. It targets the sacrificial mandate,
 /// never #1, so the worked example on Home is permanent.
@@ -66,7 +67,7 @@ function Screens(route: string, go: (r: string) => void) {
     case "bot":
       return (
         <Gated headline="Bot" why="Connect a wallet named as keeper by a mandate to see what it may do right now.">
-          <Placeholder title="Bot" />
+          <Bot />
         </Gated>
       );
     case "lookup":
