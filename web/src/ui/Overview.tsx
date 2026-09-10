@@ -1,5 +1,6 @@
 import {useEffect, useState} from "react";
 import {formatUnits, type Hex} from "viem";
+import {Seal} from "./kit";
 import {ENVOYAGE, EXPLORER, DEMO_MANDATE_ID, ENS_PARENT, KEEPER_KEY} from "../lib/config";
 import {fetchEnvoyage, fetchUniswapScale, fetchMainnetCensus, type Census, type UniswapScale, type MandateRow, type Execution as GraphExecution} from "../lib/graph";
 import {
@@ -169,7 +170,7 @@ export function Overview() {
         {!mandate && !error && <p className="pending">Reading the mandate from Sepolia…</p>}
 
         {mandate && (
-          <article className="sheet" aria-label={`Mandate ${DEMO_MANDATE_ID}`}>
+          <article className="sheet" aria-label={`Mandate ${DEMO_MANDATE_ID}`} data-state={revoked ? "revoked" : "in-force"}>
             {revoked && (
               <span className="stamp-revoked" aria-hidden="true">
                 Revoked
@@ -320,6 +321,7 @@ export function Overview() {
                 <p className="verdict" style={{margin: 0}}>
                   Right now the attorney-in-fact{" "}
                   <b>{reason === null ? "…" : allowedNow ? "may act." : "may not act."}</b>
+                  {revoked && <span className="reason">Every clause above is struck: the grantor revoked this mandate.</span>}
                   {reason && !allowedNow && (
                     <span className="reason">{REFUSAL_REASONS[reason] ?? `unknown reason ${reason}`}</span>
                   )}
@@ -561,28 +563,5 @@ export function Overview() {
         <a href="https://github.com/envoyage-protocol/envoyage">github.com/envoyage-protocol/envoyage</a>
       </footer>
     </>
-  );
-}
-
-/// The seal is state, not decoration: its centre and rim are typeset from the same
-/// values the articles above are read from, so a revoked mandate carries a dead seal.
-function Seal({centre, rim, off}: {centre: string; rim: string; off?: boolean}) {
-  return (
-    <svg className={off ? "seal off" : "seal"} viewBox="0 0 132 132" role="img" aria-label={`Seal: ${centre}`}>
-      <defs>
-        <path id="seal-rim" d="M 66,66 m -50,0 a 50,50 0 1,1 100,0 a 50,50 0 1,1 -100,0" />
-      </defs>
-      <circle cx="66" cy="66" r="63" fill="none" stroke="currentColor" strokeWidth="2.5" />
-      <circle cx="66" cy="66" r="58" fill="none" stroke="currentColor" strokeWidth="1" />
-      <circle cx="66" cy="66" r="38" fill="none" stroke="currentColor" strokeWidth="1" />
-      <text className="seal-small">
-        <textPath href="#seal-rim" startOffset="0">
-          {rim.toUpperCase()}
-        </textPath>
-      </text>
-      <text className="seal-centre" x="66" y="73" textAnchor="middle">
-        {centre}
-      </text>
-    </svg>
   );
 }

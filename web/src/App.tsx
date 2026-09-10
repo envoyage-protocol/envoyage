@@ -1,7 +1,7 @@
 import {SessionProvider, useRoute} from "./lib/session";
 import {WalletBar} from "./ui/WalletBar";
 import {Overview} from "./ui/Overview";
-import {Theft} from "./ui/Theft";
+import {useTheft, OldWay, MandateTheft} from "./ui/Theft";
 import {KeeperActs} from "./ui/KeeperActs";
 import {ENVOYAGE, EXPLORER} from "./lib/config";
 import {short} from "./ui/kit";
@@ -23,20 +23,23 @@ function Nav({route, go}: {route: string; go: (r: string) => void}) {
 }
 
 function Walkthrough() {
+  const theft = useTheft();
   return (
     <div className="walk">
       <section className="lede" aria-labelledby="w-h">
         <h1 id="w-h">
-          Don't take our word for it. <em>Perform</em> the attack.
+          You own a Uniswap v4 position. You want a bot to <em>compound</em> its fees.
         </h1>
         <p>
-          Connect any wallet. Every button below sends a real transaction to Sepolia — the theft that
-          drains a naive contract, the same theft that a mandate has no way to receive, a compound that
-          grows a position, and a revoke that kills the keeper. Nothing here is a fixture or a claim.
+          Here is what happens with the only tool that exists today — and with a mandate instead.
+        </p>
+        <p className="plain">
+          Three steps, in order. Every button sends a real transaction to Sepolia, and every outcome links to
+          Etherscan. Your wallet plays the bot; where a step needs the owner, it says so.
         </p>
       </section>
-      <Theft />
-      <KeeperActs />
+      <OldWay t={theft} />
+      <KeeperActs theftSide={<MandateTheft t={theft} />} />
     </div>
   );
 }
