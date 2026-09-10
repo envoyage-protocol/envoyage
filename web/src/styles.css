@@ -1232,3 +1232,24 @@ p.pending {
     transition: background-color 120ms ease, color 120ms ease;
   }
 }
+
+/* who is needed, and what a press would do — printed beside the button */
+.gate {
+  margin: 10px 0 0;
+  font-size: 14px;
+  color: var(--ink-muted);
+  font-style: italic;
+}
+.gate .mono {
+  font-style: normal;
+  color: var(--ink);
+}
+.gate-refused {
+  font-style: normal;
+  color: var(--ink);
+  border-left: 3px solid var(--amber);
+  padding-left: 10px;
+}
+.gate-ok {
+  color: var(--amber);
+}
