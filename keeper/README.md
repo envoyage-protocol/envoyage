@@ -66,6 +66,8 @@ Two processes must run unattended from Friday until judging ends:
 ```bash
 cd keeper && npm install
 pm2 start ecosystem.config.cjs && pm2 save
+# after editing .env: pm2 delete envoyage-keeper envoyage-swap-loop && pm2 start ecosystem.config.cjs
+# (pm2 restart --update-env does NOT re-read the ecosystem file; the ENS vars were silently missing once)
 pm2 logs envoyage-keeper --lines 20
 ```
 
