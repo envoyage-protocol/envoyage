@@ -1,6 +1,6 @@
 import {SessionProvider} from "./lib/session";
 import {Shell} from "./ui/Shell";
-import {Overview} from "./ui/Overview";
+import {Home} from "./ui/Home";
 import {useTheft, OldWay, MandateTheft} from "./ui/Theft";
 import {KeeperActs} from "./ui/KeeperActs";
 import {ConnectPanel} from "./ui/ConnectPanel";
@@ -66,7 +66,7 @@ function Screens(route: string, go: (r: string) => void) {
     case "demo":
       return <Proof />;
     default:
-      return <Overview />;
+      return <Home go={go} />;
   }
 }
 

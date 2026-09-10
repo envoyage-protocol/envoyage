@@ -133,26 +133,11 @@ export function Overview() {
 
   return (
     <>
-      {/* 1 ── what this is, before any number */}
-      <section className="lede" aria-labelledby="lede-h">
-        <h1 id="lede-h">
-          A keeper that can <em>grow</em> your position and do nothing else with it.
-        </h1>
-        <p>
-          On Uniswap v4, the only way to let a bot compound your fees is{" "}
-          <code>approve(keeper, tokenId)</code> — which says <strong>which</strong> position it may
-          touch and nothing about <strong>what</strong> it may do. An approved bot can withdraw
-          the liquidity and send it to itself. Envoyage replaces that with a{" "}
-          <strong>mandate</strong>: a limited power of attorney whose articles are enforced by the
-          contract, not promised by the keeper.
-        </p>
-      </section>
-
       {/* 2 ── the instrument */}
       <section className="exhibit" aria-labelledby="s2">
         <div className="exhibit-head">
-          <span className="caps">The instrument</span>
-          <h2 id="s2">The mandate</h2>
+          <span className="caps">Worked example</span>
+          <h2 id="s2">Mandate No. {DEMO_MANDATE_ID.toString()}, live</h2>
           <p>
             What this keeper may do to position #{mandate?.tokenId.toString() ?? "…"}, and what it may
             not. Every line is read live from the contract on Sepolia.

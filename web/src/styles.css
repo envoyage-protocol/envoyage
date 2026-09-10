@@ -1505,3 +1505,45 @@ input[type="radio"]:focus-visible {
   border: 2px solid var(--amber);
   font-size: 15px;
 }
+
+/* ── home (U7) ──────────────────────────────────────────────────────────── */
+.lede-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 24px !important;
+}
+.lede .sponsor {
+  margin-left: 4px;
+}
+.fit {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--ink);
+  padding-top: 16px;
+}
+.fit svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  max-width: 100%;
+}
+.fd-title {
+  font-family: var(--display);
+  font-size: 19px;
+  fill: var(--ink);
+}
+.fd-sub {
+  font-size: 12.5px;
+  fill: var(--ink-muted);
+}
+.fd-label {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  fill: var(--ink);
+}
+.fd-foot {
+  font-family: var(--display);
+  font-size: 18px;
+  fill: var(--ink);
+}
