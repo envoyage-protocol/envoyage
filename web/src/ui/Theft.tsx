@@ -1,4 +1,4 @@
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import {formatUnits, type Address} from "viem";
 import {useSession} from "../lib/session";
 import {NAIVE, NAIVE_VICTIM_TOKEN_ID, ENVOYAGE} from "../lib/config";
@@ -8,31 +8,68 @@ import {
   stealViaEnvoyage,
   previewTheftAgainstEnvoyage,
   positionCurrencies,
-  erc20Balance
+  erc20Balance,
+  ownerOf
 } from "../lib/actions";
-import {ActionButton, Outcome, Tx, Addr, short, type TxState} from "./kit";
+import {ActionButton, Outcome, Tx, Addr, short, Sponsor, type TxState} from "./kit";
 
 const STEAL = 1_000_000_000_000_000_000n; // 1e18 liquidity per press, so the demo re-runs
 
-/// The centrepiece. Same wallet, same calldata, two contracts. One drains a
-/// position; the other mines a failed transaction because the function it targets
-/// does not exist. Nothing here is asserted — both outcomes are transactions a
-/// judge can open on Etherscan.
-export function Theft() {
+/// The story's first and second acts share one set of handlers: the same wallet,
+/// playing the bot, sends the same Uniswap instruction — first to the contract that
+/// holds an ordinary approval, then to Envoyage. One drains a position; the other
+/// mines a failed transaction because the function it targets does not exist.
+/// Nothing here is asserted — every outcome is a transaction a judge can open.
+export function useTheft() {
   const {account, client} = useSession();
+  const [honestState, setHonest] = useState<TxState>({phase: "idle"});
   const [naiveState, setNaive] = useState<TxState>({phase: "idle"});
   const [envState, setEnv] = useState<TxState>({phase: "idle"});
   const [preview, setPreview] = useState<string | null>(null);
+  const [victimOwner, setVictimOwner] = useState<Address | null>(null);
 
   const thief = account as Address | null;
+
+  useEffect(() => {
+    ownerOf(NAIVE_VICTIM_TOKEN_ID).then(setVictimOwner);
+  }, []);
 
   async function currencies() {
     return positionCurrencies(NAIVE_VICTIM_TOKEN_ID);
   }
 
+  /// The bot doing its job: the same instruction, delivered to the position's owner.
+  /// This is what the owner approved the bot for. It is fine.
+  async function runNaiveHonest() {
+    if (!client || !thief) return;
+    const owner = victimOwner ?? (await ownerOf(NAIVE_VICTIM_TOKEN_ID));
+    if (!owner) return;
+    setHonest({phase: "running", note: "The bot is working for the owner…"});
+    try {
+      const {currency0, currency1} = await currencies();
+      const before = await erc20Balance(currency0, owner);
+      const actions = buildTheftActions(NAIVE_VICTIM_TOKEN_ID, currency0, currency1, owner, STEAL);
+      const hash = await stealViaNaive(client, NAIVE, NAIVE_VICTIM_TOKEN_ID, actions);
+      const after = await erc20Balance(currency0, owner);
+      setHonest({
+        phase: "done",
+        note: (
+          <>
+            Fine. <b>{formatUnits(after - before, 18)}</b> token0 went to the owner,{" "}
+            <Addr addr={owner} />, exactly as intended. <Tx hash={hash}>the transaction</Tx>
+          </>
+        )
+      });
+    } catch (e) {
+      setHonest({phase: "failed", note: <>Unexpected — the honest run should succeed. {String(e).slice(0, 120)}</>});
+    }
+  }
+
+  /// The bot turning hostile: the identical instruction with one field changed —
+  /// the recipient — so the liquidity lands in the bot's own wallet.
   async function runNaive() {
     if (!client || !thief) return;
-    setNaive({phase: "running", note: "Sending theft to the naive contract…"});
+    setNaive({phase: "running", note: "The bot is withdrawing to itself…"});
     try {
       const {currency0, currency1} = await currencies();
       const before = await erc20Balance(currency0, thief);
@@ -44,13 +81,13 @@ export function Theft() {
         phase: "done",
         note: (
           <>
-            Drained. <b>{formatUnits(gained, 18)}</b> token0 moved to your wallet — a position you
-            never owned. <Tx hash={hash}>the transaction</Tx>
+            Drained. <b>{formatUnits(gained, 18)}</b> token0 moved to <em>your</em> wallet — out of a
+            position you never owned. The approval permitted it. <Tx hash={hash}>the transaction</Tx>
           </>
         )
       });
     } catch (e) {
-      setNaive({phase: "failed", note: <>Unexpected — the naive theft should succeed. {String(e).slice(0, 120)}</>});
+      setNaive({phase: "failed", note: <>Unexpected — the theft should succeed here. {String(e).slice(0, 120)}</>});
     }
   }
 
@@ -68,7 +105,7 @@ export function Theft() {
 
   async function runEnvoyage() {
     if (!client || !thief) return;
-    setEnv({phase: "running", note: "Sending the same calldata to Envoyage…"});
+    setEnv({phase: "running", note: "Sending the same theft to Envoyage…"});
     try {
       const {currency0, currency1} = await currencies();
       const actions = buildTheftActions(NAIVE_VICTIM_TOKEN_ID, currency0, currency1, thief, STEAL);
@@ -79,8 +116,9 @@ export function Theft() {
               phase: "done", // the FAILURE is the success here
               note: (
                 <>
-                  Reverted on chain. A real, mined, failed transaction — same calldata as the theft on
-                  the left, no function to receive it. <Tx hash={hash}>see it fail on Etherscan</Tx>
+                  Refused on chain. A real, mined, failed transaction — the same instruction that drained
+                  the position in step 1, and no function here to receive it.{" "}
+                  <Tx hash={hash}>see it fail on Etherscan</Tx>
                 </>
               )
             }
@@ -101,65 +139,94 @@ export function Theft() {
   }
 
   const ready = !!client && !!thief;
+  return {thief, ready, victimOwner, honestState, naiveState, envState, preview, runNaiveHonest, runNaive, runPreview, runEnvoyage};
+}
 
+export type TheftFlow = ReturnType<typeof useTheft>;
+
+/// Step 1. An ordinary approval, and what it permits.
+export function OldWay({t}: {t: TheftFlow}) {
   return (
-    <section className="act-panel" aria-labelledby="theft-h">
-      <header className="act-head">
-        <span className="act-role hostile">Exhibit D · The keeper turns hostile</span>
-        <h2 id="theft-h">The same attack, against two contracts</h2>
+    <section className="step" aria-labelledby="old-h">
+      <header className="step-head">
+        <span className="step-no" aria-hidden="true">
+          1<small>The old way</small>
+        </span>
+        <h2 id="old-h">
+          An ordinary approval, <em>and what it permits</em>
+        </h2>
         <p>
-          This is the attack that drained Aperture Finance: the holder of an approval assembles a
-          Uniswap instruction to pull the liquidity out and send it to itself. You send the{" "}
-          <strong>identical calldata</strong> to two contracts. The only difference is which one
-          receives it.
+          You called <code className="mono">approve(bot, position)</code>. That tells Uniswap <strong>which</strong>{" "}
+          position the bot may touch, and nothing about <strong>what</strong> it may do. Your wallet plays the
+          bot here. Position #{NAIVE_VICTIM_TOKEN_ID.toString()} is approved to a contract that does what a bot
+          today does: it forwards whatever instruction it is handed.
         </p>
       </header>
 
-      <div className="duel">
-        <article className="sheet duel-side hostile-side">
-          <div className="docket">
-            <span className="caps">Approval · unbounded</span>
-            <span>{short(NAIVE)}</span>
-          </div>
-          <h3>
-            NaiveUtils
-            <span className="tag">accepts any instruction it is handed</span>
-          </h3>
-          <p className="duel-sub">
-            Position #{NAIVE_VICTIM_TOKEN_ID.toString()} is approved to <Addr addr={NAIVE} />, exactly as
-            automation contracts ask today.
-          </p>
-          <p className="port">execute(uint256 tokenId, bytes actions) — present</p>
-          <ActionButton label="Withdraw the liquidity to my wallet" tone="hostile" state={naiveState} onClick={runNaive} disabled={!ready} />
-          <Outcome state={naiveState} />
-        </article>
+      <article className="sheet">
+        <div className="docket">
+          <span>
+            <span className="caps">Approval · unbounded</span> · position #{NAIVE_VICTIM_TOKEN_ID.toString()}
+          </span>
+          <span>
+            approved to <Addr addr={NAIVE} /> · owned by {t.victimOwner ? <Addr addr={t.victimOwner} /> : "…"}
+          </span>
+        </div>
+        <p className="port">execute(uint256 tokenId, bytes actions) — present: the bot decides what happens</p>
 
-        <article className="sheet duel-side safe-side">
-          <div className="docket">
-            <span className="caps">Mandate · scoped</span>
-            <span>{short(ENVOYAGE)}</span>
+        <div className="presses">
+          <div className="press">
+            <span className="press-label">
+              <b>First press.</b> The bot does its job: it moves value out of the position and delivers it to the
+              owner. This is what you approved it for.
+            </span>
+            <ActionButton label="Bot: deliver to the owner" tone="default" state={t.honestState} onClick={t.runNaiveHonest} disabled={!t.ready} />
+            <Outcome state={t.honestState} />
           </div>
-          <h3>
-            Envoyage
-            <span className="tag">writes its own instructions; takes none</span>
-          </h3>
-          <p className="duel-sub">
-            The keeper holds a mandate registered with <Addr addr={ENVOYAGE} />. You send the same
-            calldata. There is no function to receive it.
-          </p>
-          <p className="port absent">execute(uint256 tokenId, bytes actions) — absent</p>
-          <div className="duel-actions">
-            <button className="act act-ghost" onClick={runPreview} disabled={!thief}>
-              Check the ABI first
-            </button>
-            <ActionButton label="Send the same theft to Envoyage" tone="default" state={envState} onClick={runEnvoyage} disabled={!ready} />
+          <div className="press">
+            <span className="press-label">
+              <b>Second press.</b> The same bot, the same instruction, one field changed: the recipient is now
+              the bot. This is the attack that drained Aperture Finance.
+            </span>
+            <ActionButton label="Bot: withdraw everything to itself" tone="hostile" state={t.naiveState} onClick={t.runNaive} disabled={!t.ready} />
+            <Outcome state={t.naiveState} />
           </div>
-          {preview && <p className="preview mono">{preview}</p>}
-          <Outcome state={envState} />
-        </article>
-      </div>
-
-      {!ready && <p className="pending" style={{marginTop: 16}}>Connect a wallet to run both, from the same account.</p>}
+        </div>
+        {!t.ready && <p className="pending" style={{marginTop: 16}}>Connect a wallet to press either button.</p>}
+      </article>
     </section>
+  );
+}
+
+/// Step 2, right-hand side. The same theft, sent to Envoyage instead.
+export function MandateTheft({t}: {t: TheftFlow}) {
+  return (
+    <article className="sheet duel-side">
+      <div className="docket">
+        <span className="caps">Same bot · same instruction</span>
+        <span>to <Addr addr={ENVOYAGE} /></span>
+      </div>
+      <h3>
+        The bot tries the theft again
+        <span className="tag">There is no function that takes an instruction. The transaction mines, and fails.</span>
+      </h3>
+      <p className="duel-sub">
+        Byte for byte the calldata from step 1, second press, addressed to Envoyage ({short(ENVOYAGE)}) instead
+        of the approved contract.
+      </p>
+      <p className="port absent">execute(uint256 tokenId, bytes actions) — absent</p>
+      <div className="duel-actions">
+        <button className="act act-ghost" onClick={t.runPreview} disabled={!t.thief}>
+          Check the ABI first
+        </button>
+        <ActionButton label="Bot: send the same theft to Envoyage" tone="hostile" state={t.envState} onClick={t.runEnvoyage} disabled={!t.ready} />
+      </div>
+      {t.preview && <p className="preview mono">{t.preview}</p>}
+      <Outcome state={t.envState} />
+      <p className="foot-note" style={{fontSize: 14}}>
+        <Sponsor name="Uniswap" /> The instruction is a real v4 action list — <code className="mono">DECREASE_LIQUIDITY</code>{" "}
+        then <code className="mono">TAKE_PAIR</code> — the same bytes the PositionManager executed a moment ago.
+      </p>
+    </article>
   );
 }
