@@ -1,4 +1,5 @@
 import {FitDiagram} from "./FitDiagram";
+import {ShutterHero} from "./ShutterHero";
 import {Overview} from "./Overview";
 import {Sponsor} from "./kit";
 
@@ -7,9 +8,9 @@ export function Home({go}: {go: (r: string) => void}) {
   return (
     <>
       <section className="lede" aria-labelledby="home-h">
-        <h1 id="home-h">
+        <ShutterHero id="home-h">
           A <em>permission layer</em> for Uniswap v4 automation.
-        </h1>
+        </ShutterHero>
         <p>
           A bot that can grow your position and do nothing else with it. Today the only way to let a bot compound your fees is an approval that says which position it may touch and nothing about what it may
           do. Envoyage replaces it with a <strong>mandate</strong>: a limited power of attorney whose terms are enforced by the contract, published
