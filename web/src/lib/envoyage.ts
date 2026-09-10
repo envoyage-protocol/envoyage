@@ -16,7 +16,8 @@ import {
   POSITION_MANAGER,
   DEPLOY_BLOCK,
   ENVOYAGE_NAMES,
-  ENS_RESOLVER
+  ENS_RESOLVER,
+  ENS_REGISTRY
 } from "./config";
 
 export const publicClient = createPublicClient({
@@ -285,4 +286,37 @@ export async function readEnsScope(positionId: bigint) {
   const out: Record<string, string> = {};
   keys.forEach((k, i) => (out[k] = values[i]));
   return {node, records: out};
+}
+
+// ── app reads (Unit 1) ───────────────────────────────────────────────────────
+
+const registryAbi = [
+  {type: "function", name: "findTokenId", stateMutability: "view", inputs: [{type: "string"}], outputs: [{type: "uint256"}]},
+  {type: "function", name: "ownerOf", stateMutability: "view", inputs: [{type: "uint256"}], outputs: [{type: "address"}]}
+] as const;
+
+/// Who owns the ENS label for a position, asked of the registry itself. The zero
+/// address means the label is not registered (or was retired). Used by the hire
+/// flow to decide whether `retire` must precede `publish`.
+export async function readNameOwner(positionId: bigint): Promise<Address> {
+  const id = (await publicClient.readContract({
+    address: ENS_REGISTRY,
+    abi: registryAbi,
+    functionName: "findTokenId",
+    args: [positionId.toString()]
+  })) as bigint;
+  if (id === 0n) return "0x0000000000000000000000000000000000000000";
+  return (await publicClient
+    .readContract({address: ENS_REGISTRY, abi: registryAbi, functionName: "ownerOf", args: [id]})
+    .catch(() => "0x0000000000000000000000000000000000000000")) as Address;
+}
+
+/// activeMandate[tokenId] on Envoyage: 0 when the position carries no live mandate.
+export async function readActiveMandate(tokenId: bigint): Promise<bigint> {
+  return (await publicClient.readContract({
+    address: ENVOYAGE,
+    abi: envoyageAbi,
+    functionName: "activeMandate",
+    args: [tokenId]
+  })) as bigint;
 }

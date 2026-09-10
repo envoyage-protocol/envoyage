@@ -231,3 +231,261 @@ export async function erc20Balance(token: Address, who: Address): Promise<bigint
     args: [who]
   })) as bigint;
 }
+
+// ── app writes and reads (Unit 1) ─────────────────────────────────────────────
+//
+// Every write below is simulate-then-send, the shape `grant` set. Errors are left
+// for the caller to decode through ui/revert.ts, so this file never grows a
+// hard-coded selector.
+
+import {
+  DEMO_POOL,
+  PERMIT2,
+  STATE_VIEW,
+  ENVOYAGE_NAMES,
+  DEMO_MINT_LIQUIDITY,
+  DEMO_TOKEN_MINT
+} from "./config";
+import {readCanCompound, REFUSAL_REASONS, type Mandate} from "./envoyage";
+
+const MINT_POSITION = 0x02;
+const SETTLE_PAIR = 0x0d;
+
+const namesWriteAbi = [
+  parseAbiItem("function publish(uint256 mandateId) returns (uint256 tokenId)"),
+  parseAbiItem("function retire(uint256 mandateId, uint256 positionId)")
+] as const;
+
+const erc20Abi = [
+  parseAbiItem("function approve(address spender, uint256 amount) returns (bool)"),
+  parseAbiItem("function allowance(address owner, address spender) view returns (uint256)"),
+  parseAbiItem("function mint(address to, uint256 amount)")
+] as const;
+
+const permit2Abi = [
+  parseAbiItem("function approve(address token, address spender, uint160 amount, uint48 expiration)"),
+  parseAbiItem("function allowance(address user, address token, address spender) view returns (uint160 amount, uint48 expiration, uint48 nonce)")
+] as const;
+
+const posmWriteAbi = [
+  parseAbiItem("function modifyLiquidities(bytes unlockData, uint256 deadline) payable"),
+  parseAbiItem("function nextTokenId() view returns (uint256)")
+] as const;
+
+const stateViewAbi = [
+  parseAbiItem("function getSlot0(bytes32 poolId) view returns (uint160 sqrtPriceX96, int24 tick, uint24 protocolFee, uint24 lpFee)")
+] as const;
+
+const POOL_KEY_TYPE = {
+  type: "tuple",
+  components: [
+    {name: "currency0", type: "address"},
+    {name: "currency1", type: "address"},
+    {name: "fee", type: "uint24"},
+    {name: "tickSpacing", type: "int24"},
+    {name: "hooks", type: "address"}
+  ]
+} as const;
+
+const MAX_UINT128 = (1n << 128n) - 1n;
+const MAX_UINT160 = (1n << 160n) - 1n;
+const MAX_UINT48 = (1n << 48n) - 1n;
+const MAX_UINT256 = (1n << 256n) - 1n;
+
+import {keccak256} from "viem";
+
+/// keccak256(abi.encode(poolKey)) — v4's PoolId.
+export function demoPoolId(): Hex {
+  return keccak256(encodeAbiParameters([POOL_KEY_TYPE], [DEMO_POOL]));
+}
+
+/// The pool's current tick, from StateView.
+export async function currentTick(): Promise<{tick: number; sqrtPriceX96: bigint}> {
+  const r = (await publicClient.readContract({
+    address: STATE_VIEW,
+    abi: stateViewAbi,
+    functionName: "getSlot0",
+    args: [demoPoolId()]
+  })) as readonly [bigint, number, number, number];
+  return {sqrtPriceX96: r[0], tick: Number(r[1])};
+}
+
+/// A range of ±`spacings` tick spacings centred on the CURRENT tick, snapped down
+/// to the spacing. A position minted at a fixed 1:1 in a pool that has drifted
+/// earns nothing; this one sits where the trades are.
+export function rangeAroundTick(tick: number, tickSpacing: number, spacings = 10): {tickLower: number; tickUpper: number} {
+  const snapped = Math.floor(tick / tickSpacing) * tickSpacing;
+  return {tickLower: snapped - tickSpacing * spacings, tickUpper: snapped + tickSpacing * spacings};
+}
+
+/// MINT_POSITION + SETTLE_PAIR, encoded exactly as script/01_DeployAndSeed.s.sol
+/// `_mintPosition` does it.
+export function buildMintActions(owner: Address, tickLower: number, tickUpper: number, liquidity: bigint): Hex {
+  const actions = encodePacked(["uint8", "uint8"], [MINT_POSITION, SETTLE_PAIR]);
+  const params: Hex[] = [
+    encodeAbiParameters(
+      [POOL_KEY_TYPE, {type: "int24"}, {type: "int24"}, {type: "uint256"}, {type: "uint128"}, {type: "uint128"}, {type: "address"}, {type: "bytes"}],
+      [DEMO_POOL, tickLower, tickUpper, liquidity, MAX_UINT128, MAX_UINT128, owner, "0x"]
+    ),
+    encodeAbiParameters([{type: "address"}, {type: "address"}], [DEMO_POOL.currency0, DEMO_POOL.currency1])
+  ];
+  return encodeAbiParameters([{type: "bytes"}, {type: "bytes[]"}], [actions, params]);
+}
+
+export async function mintDemoTokens(w: WalletClient, token: Address, amount = DEMO_TOKEN_MINT): Promise<Hex> {
+  const {request} = await publicClient.simulateContract({
+    account: w.account!,
+    address: token,
+    abi: erc20Abi,
+    functionName: "mint",
+    args: [w.account!.address, amount]
+  });
+  const hash = await w.writeContract({...request, chain: CHAIN});
+  await publicClient.waitForTransactionReceipt({hash});
+  return hash;
+}
+
+export async function erc20Allowance(token: Address, owner: Address, spender: Address): Promise<bigint> {
+  return (await publicClient.readContract({address: token, abi: erc20Abi, functionName: "allowance", args: [owner, spender]})) as bigint;
+}
+
+/// Hop one of two: the token to Permit2.
+export async function approveTokenToPermit2(w: WalletClient, token: Address): Promise<Hex> {
+  const {request} = await publicClient.simulateContract({
+    account: w.account!,
+    address: token,
+    abi: erc20Abi,
+    functionName: "approve",
+    args: [PERMIT2, MAX_UINT256]
+  });
+  const hash = await w.writeContract({...request, chain: CHAIN});
+  await publicClient.waitForTransactionReceipt({hash});
+  return hash;
+}
+
+export async function permit2Allowance(owner: Address, token: Address): Promise<{amount: bigint; expiration: number}> {
+  const r = (await publicClient.readContract({
+    address: PERMIT2,
+    abi: permit2Abi,
+    functionName: "allowance",
+    args: [owner, token, POSITION_MANAGER]
+  })) as readonly [bigint, number, number];
+  return {amount: r[0], expiration: Number(r[1])};
+}
+
+/// Hop two of two: Permit2 to the PositionManager. Both hops are required; POSM
+/// pulls payment through Permit2 whenever the payer is not itself.
+export async function approvePermit2ToPosm(w: WalletClient, token: Address): Promise<Hex> {
+  const {request} = await publicClient.simulateContract({
+    account: w.account!,
+    address: PERMIT2,
+    abi: permit2Abi,
+    functionName: "approve",
+    args: [token, POSITION_MANAGER, MAX_UINT160, Number(MAX_UINT48)]
+  });
+  const hash = await w.writeContract({...request, chain: CHAIN});
+  await publicClient.waitForTransactionReceipt({hash});
+  return hash;
+}
+
+export async function nextTokenId(): Promise<bigint> {
+  return (await publicClient.readContract({address: POSITION_MANAGER, abi: posmWriteAbi, functionName: "nextTokenId"})) as bigint;
+}
+
+/// Mints a demo-pool position for the connected wallet, centred on the current
+/// tick. The realised tokenId is read from the Transfer log in the receipt, never
+/// from nextTokenId at simulation time.
+export async function mintDemoPosition(w: WalletClient, liquidity = DEMO_MINT_LIQUIDITY): Promise<{hash: Hex; tokenId: bigint; tickLower: number; tickUpper: number}> {
+  const owner = w.account!.address;
+  const {tick} = await currentTick();
+  const {tickLower, tickUpper} = rangeAroundTick(tick, DEMO_POOL.tickSpacing);
+  const deadline = BigInt(Math.floor(Date.now() / 1000) + 300);
+  const {request} = await publicClient.simulateContract({
+    account: w.account!,
+    address: POSITION_MANAGER,
+    abi: posmWriteAbi,
+    functionName: "modifyLiquidities",
+    args: [buildMintActions(owner, tickLower, tickUpper, liquidity), deadline]
+  });
+  const hash = await w.writeContract({...request, chain: CHAIN});
+  const receipt = await publicClient.waitForTransactionReceipt({hash});
+  const transfer = parseEventLogs({
+    abi: [parseAbiItem("event Transfer(address indexed from, address indexed to, uint256 indexed id)")],
+    logs: receipt.logs.filter((l) => l.address.toLowerCase() === POSITION_MANAGER.toLowerCase())
+  })[0] as {args: {id: bigint}} | undefined;
+  if (!transfer) throw new Error("mint landed but the PositionManager emitted no Transfer");
+  return {hash, tokenId: transfer.args.id, tickLower, tickUpper};
+}
+
+export async function publishName(w: WalletClient, mandateId: bigint): Promise<Hex> {
+  const {request} = await publicClient.simulateContract({
+    account: w.account!,
+    address: ENVOYAGE_NAMES,
+    abi: namesWriteAbi,
+    functionName: "publish",
+    args: [mandateId]
+  });
+  const hash = await w.writeContract({...request, chain: CHAIN});
+  await publicClient.waitForTransactionReceipt({hash});
+  return hash;
+}
+
+export async function retireName(w: WalletClient, mandateId: bigint, positionId: bigint): Promise<Hex> {
+  const {request} = await publicClient.simulateContract({
+    account: w.account!,
+    address: ENVOYAGE_NAMES,
+    abi: namesWriteAbi,
+    functionName: "retire",
+    args: [mandateId, positionId]
+  });
+  const hash = await w.writeContract({...request, chain: CHAIN});
+  await publicClient.waitForTransactionReceipt({hash});
+  return hash;
+}
+
+// ── pre-flight ────────────────────────────────────────────────────────────────
+
+export type Preflight = {
+  /// The contract's own gate, from canCompound(): 0x00000000 when open.
+  gate: Hex;
+  /// What a compound from the keeper would do right now.
+  verdict: "may act" | "no fees yet" | "refused";
+  /// One sentence, for the screen.
+  sentence: string;
+  /// The decoded error name behind a refusal, when there is one.
+  error: string | null;
+};
+
+/// canCompound() plus a simulated compound() from the keeper account. canCompound
+/// cannot see fee availability, so the simulation is what turns "allowed" into
+/// "allowed, and there is something to do". Throws when the chain cannot be read —
+/// a failed read must never come back as "may act".
+export async function preflight(
+  mandateId: bigint,
+  keeper: Address,
+  mandate?: Mandate | null,
+  explain?: (e: unknown, ctx: {mandate?: Mandate | null}) => string,
+  nameOf?: (e: unknown) => string | null
+): Promise<Preflight> {
+  const gate = await readCanCompound(mandateId);
+  if (gate !== "0x00000000") {
+    const text = REFUSAL_REASONS[gate] ?? `refused with selector ${gate}`;
+    return {gate, verdict: "refused", sentence: text, error: null};
+  }
+  try {
+    await publicClient.simulateContract({
+      account: keeper,
+      address: ENVOYAGE,
+      abi: envoyageAbi,
+      functionName: "compound",
+      args: [mandateId, 0n]
+    });
+    return {gate, verdict: "may act", sentence: "Fees are waiting; the bot may compound now.", error: null};
+  } catch (e) {
+    const name = nameOf ? nameOf(e) : null;
+    if (name === "ZeroLiquidityDelta" || name === "FeeBelowMinimum") {
+      return {gate, verdict: "no fees yet", sentence: "No fees have accrued since the last compound — nothing to reinvest yet.", error: name};
+    }
+    return {gate, verdict: "refused", sentence: explain ? explain(e, {mandate}) : String(e), error: name};
+  }
+}
