@@ -43,3 +43,51 @@ export const KEEPER_KEY = "envoyage:lastRun";
 /// contract asks for today — so the theft can be performed for real, not described.
 export const NAIVE = "0x0Fc426408a752f46d46b1e182aa018647146Aa56" as const;
 export const NAIVE_VICTIM_TOKEN_ID = 39022n;
+
+// ── app (Units 1–7) ──────────────────────────────────────────────────────────
+
+/// The demo pool key, copied from deployments/sepolia.json. Token addresses are
+/// sorted (currency0 < currency1) as v4 requires; the hook is the zero address.
+export const DEMO_POOL = {
+  currency0: "0x1dC7e196Ff124C79191154C635df75a315e00985" as const,
+  currency1: "0x7D5Dc05acea592601e6888ccB04D625CDc6c13DC" as const,
+  fee: 10000,
+  tickSpacing: 200,
+  hooks: "0x0000000000000000000000000000000000000000" as const
+};
+
+/// Uniswap's canonical Permit2 and the v4 StateView on Sepolia. StateView is the
+/// documented way to read slot0 from the singleton PoolManager without computing
+/// extsload slots by hand.
+export const PERMIT2 = "0x000000000022D473030F116dDEE9F6B43aC78BA3" as const;
+export const STATE_VIEW = "0xe1dd9c3fa50edb962e442f60dfbc432e24537e4c" as const;
+
+/// ENSv2 permissioned registry that EnvoyageNames registers subnames in (read from
+/// EnvoyageNames.REGISTRY()). Used only to ask who owns a label.
+export const ENS_REGISTRY = "0x6CD593BE2B0fF155120b49042Cf57089625189F6" as const;
+
+/// The reference keeper: Envoyage's own bot, pre-filled and read-only in the hire
+/// form (origin decision). It is the keeper of mandate #1.
+export const REFERENCE_KEEPER = "0xd643ee841bf365E4d5f46Bb9072B18a4cD056C5B" as const;
+
+/// The mandate the Proof tab may revoke. Mandate #1 is permanent and is never
+/// revoked by any screen; this one lives on its own position and is re-granted
+/// between takes. Set by the operator after granting it.
+export const SACRIFICIAL_MANDATE_ID = 2n;
+
+/// Contract limit on the keeper's share of harvested fees, in bps.
+export const MAX_FEE_BPS = 1000;
+
+/// Time-to-first-compound bound for a fresh mandate: swap-loop cadence + keeper
+/// poll + indexer lag. Shown on My mandates as "expected within ~N min".
+export const SWAP_CADENCE_S = 120;
+export const KEEPER_POLL_S = 30;
+export const INDEXER_LAG_S = 60;
+export const FIRST_COMPOUND_BOUND_S = SWAP_CADENCE_S + KEEPER_POLL_S + INDEXER_LAG_S;
+
+/// Liquidity for a demo mint. Matches the seed script's 100e18 so one swap round
+/// trip on the demo pool clears ZeroLiquidityDelta for the new position too.
+export const DEMO_MINT_LIQUIDITY = 100_000_000_000_000_000_000n;
+/// Demo tokens minted to a wallet before it mints a position; the tokens are freely
+/// mintable, so the amount only has to cover the position with margin.
+export const DEMO_TOKEN_MINT = 1_000_000_000_000_000_000_000n;

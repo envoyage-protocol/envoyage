@@ -163,3 +163,72 @@ export async function fetchUniswapScale(): Promise<UniswapScale | null> {
     sampledOwners: new Set(d.positions.map((p) => p.owner)).size
   };
 }
+
+// ── app queries (Unit 1) ─────────────────────────────────────────────────────
+
+/// A mandate row as the app's lists need it: the existing MandateRow fields plus
+/// the grant/revoke provenance and the position's live flag.
+export type AppMandate = MandateRow & {
+  mandateId: string;
+  feeRecipient: string;
+  compoundAllowed: boolean;
+  grantedAt: string;
+  grantedAtBlock: string;
+  grantedTx: string;
+  revokedAt: string | null;
+  revokedTx: string | null;
+  position: {id: string; hasActiveMandate: boolean};
+};
+
+const APP_MANDATE_FIELDS = `
+  id mandateId status grantor maxFeeBps feeRecipient compoundAllowed minInterval expiry
+  executionCount totalFee0ToKeeper totalLiquidityAdded lastExecutedAt
+  grantedAt grantedAtBlock grantedTx revokedAt revokedTx
+  keeper { id } position { id hasActiveMandate }
+`;
+
+export async function fetchMandatesByGrantor(grantor: string): Promise<{mandates: AppMandate[]; indexedBlock: number}> {
+  const d = await gql<{mandates: AppMandate[]; _meta: {block: {number: number}}}>(
+    STUDIO,
+    `query ($g: Bytes!) { _meta { block { number } } mandates(where: {grantor: $g}, orderBy: mandateId) { ${APP_MANDATE_FIELDS} } }`,
+    {g: grantor.toLowerCase()}
+  );
+  return {mandates: d.mandates, indexedBlock: d._meta.block.number};
+}
+
+export async function fetchMandatesByKeeper(keeper: string): Promise<{mandates: AppMandate[]; indexedBlock: number}> {
+  const d = await gql<{mandates: AppMandate[]; _meta: {block: {number: number}}}>(
+    STUDIO,
+    `query ($k: String!) { _meta { block { number } } mandates(where: {keeper: $k}, orderBy: mandateId) { ${APP_MANDATE_FIELDS} } }`,
+    {k: keeper.toLowerCase()}
+  );
+  return {mandates: d.mandates, indexedBlock: d._meta.block.number};
+}
+
+/// One mandate with its executions, or null when the subgraph has never seen the
+/// id. The null is a real answer ("not indexed"), distinct from a thrown failure.
+export async function fetchMandate(id: bigint): Promise<{mandate: AppMandate | null; executions: Execution[]; indexedBlock: number}> {
+  const d = await gql<{mandate: AppMandate | null; executions: Execution[]; _meta: {block: {number: number}}}>(
+    STUDIO,
+    `query ($id: ID!, $m: String!) {
+      _meta { block { number } }
+      mandate(id: $id) { ${APP_MANDATE_FIELDS} }
+      executions(where: {mandate: $m}, orderBy: block, orderDirection: desc, first: 20) {
+        id block timestamp tx fee0ToKeeper fee1ToKeeper liquidityAdded
+      }
+    }`,
+    {id: id.toString(), m: id.toString()}
+  );
+  return {mandate: d.mandate, executions: d.executions, indexedBlock: d._meta.block.number};
+}
+
+/// Every mandate ever granted on a position, newest first. The first row is the
+/// current one (a position carries at most one live mandate).
+export async function fetchMandatesByPosition(positionId: bigint): Promise<{mandates: AppMandate[]; indexedBlock: number}> {
+  const d = await gql<{mandates: AppMandate[]; _meta: {block: {number: number}}}>(
+    STUDIO,
+    `query ($p: String!) { _meta { block { number } } mandates(where: {position: $p}, orderBy: mandateId, orderDirection: desc) { ${APP_MANDATE_FIELDS} } }`,
+    {p: positionId.toString()}
+  );
+  return {mandates: d.mandates, indexedBlock: d._meta.block.number};
+}
