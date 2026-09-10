@@ -6,6 +6,8 @@ import {publicClient, readCanCompound, readMandate, readPositionOwner, readEnsSc
 import {fetchEnvoyage} from "../lib/graph";
 import {compound, revoke, positionLiquidity, positionCurrencies} from "../lib/actions";
 import {ActionButton, Outcome, Tx, Addr, Seal, Sponsor, short, type TxState} from "./kit";
+import {envoyageAbi} from "../lib/envoyage";
+import {explainRevert, sameAddress} from "./revert";
 
 const ZERO = "0x0000000000000000000000000000000000000000";
 const SYMBOL = parseAbiItem("function symbol() view returns (string)");
@@ -42,6 +44,12 @@ export function KeeperActs({mandateId = DEMO_MANDATE_ID, theftSide}: {mandateId?
   const [retryState, setRetry] = useState<TxState>({phase: "idle"});
   const [ensWrite, setEnsWrite] = useState<TxState>({phase: "idle"});
 
+  // What a press would do, before it is pressed: a simulateContract from the
+  // connected account, decoded into a sentence. Same idea as canCompound, but it
+  // knows the caller. null = not run (wrong wallet or no wallet); "ok" = would land.
+  const [compoundPre, setCompoundPre] = useState<string | null>(null);
+  const [revokePre, setRevokePre] = useState<string | null>(null);
+
   // Uniswap: whose position, in which pool, approved to whom.
   const [pos, setPos] = useState<{owner: Address; approved: Address} | null>(null);
   const [pool, setPool] = useState<{sym0: string; sym1: string} | null>(null);
@@ -55,10 +63,14 @@ export function KeeperActs({mandateId = DEMO_MANDATE_ID, theftSide}: {mandateId?
   const [ens, setEns] = useState<EnsScope | null>(null);
   const [ensReadAt, setEnsReadAt] = useState<"mount" | "compound" | "report" | "revoke">("mount");
   const [lastCompoundBlock, setLastCompoundBlock] = useState<bigint | null>(null);
+  // The keeper as it was before a revoke zeroed it, so step 3 still knows which
+  // wallet plays the bot afterwards.
+  const [lastKeeper, setLastKeeper] = useState<Address | null>(null);
 
   async function refresh() {
     const m = await readMandate(mandateId).catch(() => null);
     setMandate(m);
+    if (m && m.keeper !== ZERO) setLastKeeper(m.keeper);
     setReason(await readCanCompound(mandateId).catch(() => null));
     if (m) setLiq(await positionLiquidity(m.tokenId).catch(() => null));
     return m;
@@ -108,7 +120,35 @@ export function KeeperActs({mandateId = DEMO_MANDATE_ID, theftSide}: {mandateId?
   const allowed = reason === "0x00000000";
   const revoked = mandate?.keeper === ZERO;
   const approvedToEnvoyage = pos?.approved.toLowerCase() === ENVOYAGE.toLowerCase();
-  const isKeeper = !!account && !!mandate && account.toLowerCase() === mandate.keeper.toLowerCase();
+  const isKeeper = !!account && !!mandate && !revoked && sameAddress(account, mandate.keeper);
+  const isOwner = !!account && !!mandate && sameAddress(account, mandate.grantor);
+  const isBot = !!account && sameAddress(account, lastKeeper ?? mandate?.keeper);
+
+  /// Dry-runs compound (as the keeper) and revoke (as the owner) from the connected
+  /// account and keeps the decoded refusal beside each button. Runs on mount, on
+  /// account change, and after every transaction.
+  async function preflight(m: Mandate | null, who: Address | null) {
+    if (!m || !who) {
+      setCompoundPre(null);
+      setRevokePre(null);
+      return;
+    }
+    const isK = m.keeper !== ZERO && sameAddress(who, m.keeper);
+    const isO = sameAddress(who, m.grantor);
+    const run = async (functionName: "compound" | "revoke", args: readonly bigint[]) => {
+      try {
+        await publicClient.simulateContract({account: who, address: ENVOYAGE, abi: envoyageAbi, functionName, args: args as never});
+        return "ok";
+      } catch (e) {
+        return explainRevert(e, {mandate: m});
+      }
+    };
+    setCompoundPre(isK ? await run("compound", [mandateId, 0n]) : null);
+    setRevokePre(isO && m.keeper !== ZERO ? await run("revoke", [mandateId]) : null);
+  }
+  useEffect(() => {
+    preflight(mandate, account as Address | null);
+  }, [mandate, account]);
 
   /// Polls the subgraph until mandate N's executionCount rises above the baseline
   /// taken before the compound was sent, then reads the execution row by its tx hash.
@@ -164,7 +204,7 @@ export function KeeperActs({mandateId = DEMO_MANDATE_ID, theftSide}: {mandateId?
       if (mandate) rereadEns(mandate.tokenId, "compound");
       watchIndexer(hash, baseline);
     } catch (e) {
-      setComp({phase: "failed", note: <>{humanize(e)}</>});
+      setComp({phase: "failed", note: <>{explainRevert(e, {mandate})}</>});
     }
   }
 
@@ -187,7 +227,7 @@ export function KeeperActs({mandateId = DEMO_MANDATE_ID, theftSide}: {mandateId?
       setEnsWrite({phase: "done", note: <>Written: block {value}. <Tx hash={hash}>transaction</Tx></>});
       rereadEns(mandate.tokenId, "report");
     } catch (e) {
-      setEnsWrite({phase: "failed", note: <>{humanize(e)}</>});
+      setEnsWrite({phase: "failed", note: <>{explainRevert(e, {mandate})}</>});
     }
   }
 
@@ -207,7 +247,7 @@ export function KeeperActs({mandateId = DEMO_MANDATE_ID, theftSide}: {mandateId?
       await refresh();
       if (mandate) rereadEns(mandate.tokenId, "revoke");
     } catch (e) {
-      setRev({phase: "failed", note: <>{humanize(e)}</>});
+      setRev({phase: "failed", note: <>{explainRevert(e, {mandate})}</>});
     }
   }
 
@@ -234,7 +274,7 @@ export function KeeperActs({mandateId = DEMO_MANDATE_ID, theftSide}: {mandateId?
       const hash = await compound(client, mandateId);
       setRetry({phase: "done", note: <>Unexpected: the compound went through. <Tx hash={hash}>inspect</Tx></>});
     } catch (e) {
-      setRetry({phase: "failed", note: <>{humanize(e)}</>});
+      setRetry({phase: "failed", note: <>{explainRevert(e, {mandate})}</>});
     }
   }
 
@@ -301,10 +341,19 @@ export function KeeperActs({mandateId = DEMO_MANDATE_ID, theftSide}: {mandateId?
               <span className="value num">{liq === null ? "…" : formatUnits(liq, 18)}</span>
             </div>
             <div>
-              <span className="label">Right now the bot</span>
+              <span className="label">Mandate status</span>
               <span className="value">
-                {reason === null ? "…" : allowed ? "may compound" : "may not act"}
-                {reason && !allowed && <small>{REFUSAL_REASONS[reason] ?? `reason ${reason}`}</small>}
+                {reason === null ? "…" : revoked ? "revoked" : allowed ? "active — compound allowed" : "active — compound refused"}
+                {reason && !allowed && !revoked && <small>{REFUSAL_REASONS[reason] ?? `reason ${reason}`}</small>}
+                <small>
+                  {!account
+                    ? "No wallet connected."
+                    : isKeeper
+                      ? `Connected as the keeper (${short(account)}).`
+                      : isOwner
+                        ? `Connected as the owner (${short(account)}).`
+                        : `Connected as ${short(account)}: neither the keeper nor the owner.`}
+                </small>
               </span>
             </div>
             <Seal
@@ -325,12 +374,15 @@ export function KeeperActs({mandateId = DEMO_MANDATE_ID, theftSide}: {mandateId?
               The bot compounds
               <span className="tag">Harvest the fees, put them back into the same position, keep a capped share.</span>
             </h3>
-            <p className="duel-sub">
-              {isKeeper
-                ? "You are connected as this mandate's bot."
-                : "Only the mandate's bot may call this; connect the keeper wallet to press it."}
-            </p>
-            <ActionButton label="Bot: compound now" tone="primary" state={compState} onClick={runCompound} disabled={!client || !!revoked} />
+            <ActionButton label="Bot: compound now" tone="primary" state={compState} onClick={runCompound} disabled={!client || !!revoked || !isKeeper || (compoundPre !== null && compoundPre !== "ok")} />
+            <Gate
+              need="keeper"
+              needed={mandate?.keeper}
+              ok={isKeeper}
+              revoked={!!revoked}
+              pre={compoundPre}
+              okText="Preflight from this wallet: the compound would land."
+            />
             <Outcome state={compState} />
 
             {graph.phase === "idle" && graphBaseline !== null && (
@@ -439,7 +491,8 @@ export function KeeperActs({mandateId = DEMO_MANDATE_ID, theftSide}: {mandateId?
               <span className="press-label" style={{display: "block", marginBottom: 10, fontSize: 14, color: "var(--ink-muted)"}}>
                 <b style={{color: "var(--ink)"}}>As the owner</b> ({mandate ? short(mandate.grantor) : "…"}).
               </span>
-              <ActionButton label="Owner: revoke this mandate" tone="default" state={revState} onClick={runRevoke} disabled={!client || !!revoked} />
+              <ActionButton label="Owner: revoke this mandate" tone="default" state={revState} onClick={runRevoke} disabled={!client || !!revoked || !isOwner || (revokePre !== null && revokePre !== "ok")} />
+              <Gate need="owner" needed={mandate?.grantor} ok={isOwner} revoked={!!revoked} pre={revokePre} okText="Preflight from this wallet: the revoke would land." />
               <Outcome state={revState} />
               {revoked && revState.phase === "idle" && (
                 <p className="pending" style={{marginTop: 12}}>
@@ -451,7 +504,8 @@ export function KeeperActs({mandateId = DEMO_MANDATE_ID, theftSide}: {mandateId?
               <span className="press-label" style={{display: "block", marginBottom: 10, fontSize: 14, color: "var(--ink-muted)"}}>
                 <b style={{color: "var(--ink)"}}>As the bot</b>, afterwards.
               </span>
-              <ActionButton label="Bot: try to compound again" tone="hostile" state={retryState} onClick={runRetry} disabled={!client} />
+              <ActionButton label="Bot: try to compound again" tone="hostile" state={retryState} onClick={runRetry} disabled={!client || !isBot} />
+              <Gate need="keeper" needed={lastKeeper ?? mandate?.keeper} ok={isBot} revoked={false} pre={null} okText="" />
               <Outcome state={retryState} />
             </div>
           </div>
@@ -485,12 +539,39 @@ export function KeeperActs({mandateId = DEMO_MANDATE_ID, theftSide}: {mandateId?
   );
 }
 
-function humanize(e: unknown): string {
-  const s = e instanceof Error ? e.message : String(e);
-  for (const [sel, text] of Object.entries(REFUSAL_REASONS)) {
-    if (sel !== "0x00000000" && s.includes(sel)) return text;
+/// Who is needed, before anything is pressed. Prints the wallet to switch to when
+/// the connected one is wrong, and the decoded dry-run when it is right.
+function Gate({
+  need,
+  needed,
+  ok,
+  revoked,
+  pre,
+  okText
+}: {
+  need: "keeper" | "owner";
+  needed?: Address | null;
+  ok: boolean;
+  revoked: boolean;
+  pre: string | null;
+  okText: string;
+}) {
+  const {account} = useSession();
+  if (revoked && need === "keeper") return <p className="gate">The mandate is revoked; there is no keeper.</p>;
+  if (!ok) {
+    const addr = needed && needed !== ZERO ? short(needed) : "…";
+    return (
+      <p className="gate" role="status">
+        {account ? "Wrong wallet. " : "No wallet connected. "}
+        Switch to the {need} wallet <span className="mono">{addr}</span>.
+      </p>
+    );
   }
-  if (s.includes("EACUnauthorizedAccountRoles")) return "Refused by ENS: this wallet holds no role for that key.";
-  const named = s.match(/reverted with the following reason:\s*([^\n]+)/);
-  return named ? named[1] : s.split("\n")[0];
+  if (pre === null) return <p className="gate">Checking what this wallet's call would do…</p>;
+  if (pre === "ok") return okText ? <p className="gate gate-ok">{okText}</p> : null;
+  return (
+    <p className="gate gate-refused" role="status">
+      <b>Would be refused:</b> {pre}
+    </p>
+  );
 }

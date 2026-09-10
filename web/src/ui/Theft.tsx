@@ -1,7 +1,9 @@
 import {useEffect, useState} from "react";
 import {formatUnits, type Address} from "viem";
 import {useSession} from "../lib/session";
-import {NAIVE, NAIVE_VICTIM_TOKEN_ID, ENVOYAGE} from "../lib/config";
+import {NAIVE, NAIVE_VICTIM_TOKEN_ID, ENVOYAGE, DEMO_MANDATE_ID} from "../lib/config";
+import {readMandate} from "../lib/envoyage";
+import {explainRevert, sameAddress} from "./revert";
 import {
   buildTheftActions,
   stealViaNaive,
@@ -27,11 +29,17 @@ export function useTheft() {
   const [envState, setEnv] = useState<TxState>({phase: "idle"});
   const [preview, setPreview] = useState<string | null>(null);
   const [victimOwner, setVictimOwner] = useState<Address | null>(null);
+  // The bot in this story is the demo mandate's keeper. Both theft presses are
+  // gated on that wallet, so "the same bot" is literally the same address.
+  const [keeper, setKeeper] = useState<Address | null>(null);
 
   const thief = account as Address | null;
 
   useEffect(() => {
     ownerOf(NAIVE_VICTIM_TOKEN_ID).then(setVictimOwner);
+    readMandate(DEMO_MANDATE_ID)
+      .then((m) => setKeeper(m.keeper === "0x0000000000000000000000000000000000000000" ? null : m.keeper))
+      .catch(() => {});
   }, []);
 
   async function currencies() {
@@ -61,7 +69,7 @@ export function useTheft() {
         )
       });
     } catch (e) {
-      setHonest({phase: "failed", note: <>Unexpected — the honest run should succeed. {String(e).slice(0, 120)}</>});
+      setHonest({phase: "failed", note: <>Unexpected — the honest run should succeed. {explainRevert(e)}</>});
     }
   }
 
@@ -87,7 +95,7 @@ export function useTheft() {
         )
       });
     } catch (e) {
-      setNaive({phase: "failed", note: <>Unexpected — the theft should succeed here. {String(e).slice(0, 120)}</>});
+      setNaive({phase: "failed", note: <>Unexpected — the theft should succeed here. {explainRevert(e)}</>});
     }
   }
 
@@ -131,15 +139,16 @@ export function useTheft() {
         note: (
           <>
             Your wallet refused to submit a transaction it predicts will fail — which is itself the
-            point: there is nothing here to call. {String(e).slice(0, 100)}
+            point: there is nothing here to call. {explainRevert(e)}
           </>
         )
       });
     }
   }
 
-  const ready = !!client && !!thief;
-  return {thief, ready, victimOwner, honestState, naiveState, envState, preview, runNaiveHonest, runNaive, runPreview, runEnvoyage};
+  const isKeeper = !!thief && !!keeper && sameAddress(thief, keeper);
+  const ready = !!client && !!thief && isKeeper;
+  return {thief, ready, keeper, isKeeper, victimOwner, honestState, naiveState, envState, preview, runNaiveHonest, runNaive, runPreview, runEnvoyage};
 }
 
 export type TheftFlow = ReturnType<typeof useTheft>;
@@ -192,7 +201,7 @@ export function OldWay({t}: {t: TheftFlow}) {
             <Outcome state={t.naiveState} />
           </div>
         </div>
-        {!t.ready && <p className="pending" style={{marginTop: 16}}>Connect a wallet to press either button.</p>}
+        {!t.ready && <TheftGate t={t} />}
       </article>
     </section>
   );
@@ -222,11 +231,22 @@ export function MandateTheft({t}: {t: TheftFlow}) {
         <ActionButton label="Bot: send the same theft to Envoyage" tone="hostile" state={t.envState} onClick={t.runEnvoyage} disabled={!t.ready} />
       </div>
       {t.preview && <p className="preview mono">{t.preview}</p>}
+      {!t.ready && <TheftGate t={t} />}
       <Outcome state={t.envState} />
       <p className="foot-note" style={{fontSize: 14}}>
         <Sponsor name="Uniswap" /> The instruction is a real v4 action list — <code className="mono">DECREASE_LIQUIDITY</code>{" "}
         then <code className="mono">TAKE_PAIR</code> — the same bytes the PositionManager executed a moment ago.
       </p>
     </article>
+  );
+}
+
+/// Who is needed for the theft presses: the bot, i.e. the mandate's keeper wallet.
+function TheftGate({t}: {t: TheftFlow}) {
+  return (
+    <p className="gate" role="status" style={{marginTop: 16}}>
+      {t.thief ? "Wrong wallet. " : "No wallet connected. "}
+      Switch to the keeper wallet <span className="mono">{t.keeper ? short(t.keeper) : "…"}</span> — the bot.
+    </p>
   );
 }
