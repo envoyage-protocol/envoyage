@@ -9,6 +9,7 @@ import {SACRIFICIAL_MANDATE_ID} from "./lib/config";
 import {Hire} from "./ui/Hire";
 import {MyMandates} from "./ui/MyMandates";
 import {Bot} from "./ui/Bot";
+import {Lookup} from "./ui/Lookup";
 
 /// The walkthrough, preserved as the Proof tab. It targets the sacrificial mandate,
 /// never #1, so the worked example on Home is permanent.
@@ -39,18 +40,8 @@ function Gated({headline, why, children}: {headline: string; why: string; childr
   return <>{children}</>;
 }
 
-function Placeholder({title}: {title: string}) {
-  return (
-    <section className="exhibit">
-      <div className="exhibit-head">
-        <span className="caps">Coming in this build</span>
-        <h2>{title}</h2>
-      </div>
-    </section>
-  );
-}
-
 function Screens(route: string, go: (r: string) => void) {
+  if (route.startsWith("lookup/")) return <Lookup key={route} initial={decodeURIComponent(route.slice("lookup/".length))} />;
   switch (route) {
     case "hire":
       return (
@@ -71,7 +62,7 @@ function Screens(route: string, go: (r: string) => void) {
         </Gated>
       );
     case "lookup":
-      return <Placeholder title="Lookup" />;
+      return <Lookup />;
     case "demo":
       return <Proof />;
     default:
