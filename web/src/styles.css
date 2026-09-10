@@ -134,17 +134,20 @@ b {
   cursor: pointer;
 }
 .brand .plate {
-  width: 40px;
-  height: 40px;
-  background: var(--ink);
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   flex: none;
 }
+/* The logo is warm white on transparent, drawn for dark grounds. Inverting turns the
+   white E to ink; the hue rotation brings the inverted (blue) arc back to amber. */
 .brand img {
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   display: block;
+  object-fit: contain;
+  filter: invert(1) hue-rotate(180deg) saturate(1.4) contrast(1.1);
 }
 .brand .word {
   font-size: 22px;
