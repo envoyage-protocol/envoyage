@@ -50,10 +50,19 @@ const MIN_FEE = BigInt(process.env.MIN_FEE ?? "1000000000000");
 /// Two operators, not two endpoints from one provider. Three keys from a single
 /// provider share one failure domain: when it rate-limits, every one of them
 /// rate-limits together and the fallback never actually fails over.
+///
+/// 1rpc.io was removed on 10 Sept: it dropped Sepolia from its free tier and,
+/// before saying so, returned empty results with HTTP 200. A fallback transport
+/// only moves on when a call errors, so a keeper on that endpoint would have seen
+/// no work and reported nothing wrong.
 const RPCS = (process.env.SEPOLIA_RPC_URL
   ? [process.env.SEPOLIA_RPC_URL]
   : []
-).concat(["https://ethereum-sepolia-rpc.publicnode.com", "https://1rpc.io/sepolia"]);
+).concat(["https://ethereum-sepolia-rpc.publicnode.com"]);
+
+/// Below this the keeper cannot afford a compound (~430k gas at a few gwei) and
+/// says so loudly rather than failing on the next send.
+const LOW_BALANCE = BigInt(process.env.LOW_BALANCE_WEI ?? "5000000000000000"); // 0.005 ETH
 
 /// Optional. Set both and the keeper reports each run into its own ENS record.
 const ENVOYAGE_NAMES = process.env.ENVOYAGE_NAMES as Address | undefined;
@@ -207,6 +216,7 @@ async function main() {
 
   const bal = await pub.getBalance({address: account.address});
   log(`keeper ${account.address}, balance ${formatUnits(bal, 18)} ETH`);
+  if (bal < LOW_BALANCE) log(`WARNING: balance below ${formatUnits(LOW_BALANCE, 18)} ETH — fund the keeper before judging`);
   log(`envoyage ${ENVOYAGE}, minFee ${MIN_FEE}`);
   log(ENVOYAGE_NAMES && ENS_RESOLVER ? `ens reporting on, key ${KEEPER_KEY}` : "ens reporting off");
 
