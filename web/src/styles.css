@@ -174,11 +174,15 @@ b {
   align-items: center;
   gap: 12px 24px;
   flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .tabs {
   display: flex;
   gap: 4px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 .tab {
   font: inherit;
@@ -1252,4 +1256,100 @@ p.pending {
 }
 .gate-ok {
   color: var(--amber);
+}
+
+/* ── app shell (U2) ─────────────────────────────────────────────────────── */
+.skip {
+  position: absolute;
+  left: -999px;
+  top: 8px;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 8px 12px;
+  z-index: 10;
+}
+.skip:focus {
+  left: 8px;
+}
+.net-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px 24px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding: 12px 16px;
+  border: 2px solid var(--amber);
+  background: var(--paper);
+  font-size: 15px;
+}
+.connect-panel {
+  margin-top: clamp(40px, 6vw, 72px);
+}
+
+/* step runner */
+.step-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--ink);
+}
+.step-row {
+  display: grid;
+  grid-template-columns: 2.2em 1fr auto;
+  gap: 8px 12px;
+  align-items: start;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.step-mark {
+  font-family: var(--mono);
+  font-size: 14px;
+  width: 2em;
+  height: 2em;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--ink);
+  border-radius: 50%;
+}
+.step-row.done .step-mark,
+.step-row.skipped .step-mark {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: var(--paper);
+}
+.step-row.running .step-mark {
+  border-style: dashed;
+}
+.step-row.failed .step-mark {
+  background: var(--ink);
+  color: var(--paper);
+}
+.step-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.step-label {
+  font-size: 17px;
+}
+.step-state {
+  font-size: 14px;
+  color: var(--ink-muted);
+  overflow-wrap: anywhere;
+}
+.step-error {
+  color: var(--ink);
+  border-left: 3px solid var(--amber);
+  padding-left: 8px;
+  display: inline-block;
+}
+@media (max-width: 480px) {
+  .step-row {
+    grid-template-columns: 2.2em 1fr;
+  }
+  .step-row > button {
+    grid-column: 2;
+  }
 }
