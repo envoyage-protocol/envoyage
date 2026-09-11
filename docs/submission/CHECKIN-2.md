@@ -16,6 +16,10 @@ Paste-ready. Keep it short; the form is a status update, not a pitch.
 
 - App finishing pass and public URL; author walkthrough with real wallets.
 
+**Biggest challenge right now**
+
+- Making the three integrations *legible in the interface*. The system works end to end — the bot takes its task list from The Graph, compounds on Uniswap, and writes its one permitted ENS record — but on screen these read as labels next to buttons rather than as a system a viewer understands. Same for the UI/UX: it went from a guided walkthrough to a working app overnight (hire, my mandates, bot, lookup), and the flow now needs a design pass so a first-time viewer gets it without narration. That's today's work.
+
 **What's blocked / needs a decision**
 
 - Uniswap Developer Feedback Form (qualification requirement) — author submitting today.
