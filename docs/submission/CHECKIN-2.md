@@ -18,9 +18,7 @@ Select (max 3 partner prizes):
 
 1. **Uniswap** — Best Uniswap Stack Contribution
 2. **ENS** — Best Use of ENSv2
-3. **The Graph** — one track only *(decide today: the subgraph is the keeper's task
-   source, which argues the build/tooling track; the UI also composes our subgraph
-   with Uniswap's own v4 subgraph, which argues the composable track. Pick one.)*
+3. **The Graph** — *Best Use of Composable or Standardized Graph Products*
 
 ## What progress did you make since the last check-in?
 
@@ -34,18 +32,20 @@ Since check-in #1:
 
 - **Contract live and verified on Sepolia** — `0x8466e82E02edF3F00c0387D5C3E66d407dc7259C`, 38 tests, `forge lint` clean, immutable (no admin, no upgrade path, no `delegatecall` in the deployed bytecode).
 - **The whole loop now runs unattended.** A reference keeper and a fee-generating swap loop run under pm2 on a VPS: the bot asks our subgraph which mandates name it, compounds on Uniswap v4, and writes its one permitted ENS record — every ~2 minutes, across two live mandates, with no human involved. Verified by reading `38896.envoyage.eth` back through the ENS resolver.
-- **Two subgraphs.** Sepolia (mandates, executions, and a census of every approval ever granted on Uniswap v4's PositionManager) and a **mainnet census** that counts 1,440+ unbounded delegations over real positions — and zero scoped ones, because no bounded alternative exists there yet.
+- **Three Graph sources composed.** Our Sepolia subgraph (mandates, executions, and a census of every approval ever granted on Uniswap v4's PositionManager), the *same census schema redeployed against mainnet* (1,440+ unbounded delegations over real positions, and zero scoped ones — no bounded alternative exists there yet), and Uniswap's own v4 subgraph on the decentralized network via the Gateway. No single one of them answers the question the page asks: ours knows exactly what each keeper may do but nothing about the wider population; Uniswap's knows the population but has no concept of a permission scope, because an approval does not carry one.
 - **ENSv2 with real access control.** Every mandate is a subname whose text records are its terms. Enhanced Access Control gives the keeper write permission to exactly one key, `envoyage:lastRun`; writing any other record reverts `EACUnauthorizedAccountRoles`.
 - **The web app went from a guided walkthrough to a working product**: Hire a keeper (get a demo position → set terms → approve, grant, publish), My mandates (live rows, revoke, ENS name actions), Bot, Lookup by ENS name, and Home. 45 tests.
 - **A live adversarial demo**, kept as a Proof tab: the same attack calldata is sent to two contracts from the same wallet. Against a deliberately vulnerable comparator it drains the position; against Envoyage it mines a failed transaction, because no function exists to receive it. Two Etherscan links, opposite outcomes.
 
 ## Any blockers? Need help?
 
-No hard blockers. One open question we'd take advice on: **which of The Graph's tracks
-best fits a subgraph that is a live automation's task source rather than a read-only
-analytics layer** — our keeper takes its work queue from the subgraph, so deleting it
-stops the bot, and separately the UI composes our subgraph with Uniswap's own v4
-subgraph through the Gateway.
+No hard blockers.
+
+One thing we would take advice on: our subgraph is **load-bearing infrastructure, not
+an analytics layer** — the keeper's work queue comes from it, so deleting the subgraph
+stops the bot entirely. We have entered the Composable track because we compose three
+Graph sources, but if that "the automation runs on The Graph" angle is better served
+by a different track, we would rather be told now than after submission.
 
 ## Is there anything else you think we should know?
 
