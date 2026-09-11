@@ -1,30 +1,62 @@
 # Check-in #2 — due Fri 11 Sep, 10:59 WIB
 
-Paste-ready. Keep it short; the form is a status update, not a pitch.
+Field-by-field, matching the actual form. Copy each block into its box.
 
 ---
 
-**What's shipped since check-in #1**
+## Will you be joining us for Live Judging to qualify for Top 10 Finalist?
 
-- Envoyage live on Sepolia and verified (`0x8466e82E02edF3F00c0387D5C3E66d407dc7259C`), 38 tests, `forge lint` clean.
-- Reference keeper and a fee-supply loop running unattended on a VPS under pm2: the bot takes its task list from our subgraph, compounds on Uniswap v4, and writes its one permitted ENS record — every ~2 min, on two live mandates, no human involved. Verified by reading `38896.envoyage.eth` back from the resolver.
-- Two subgraphs: Sepolia (mandates + a census of every approval on the v4 PositionManager) and a **mainnet census** (1,440+ unbounded delegations over real positions, zero scoped).
-- ENSv2 names per mandate with per-record access control: the bot can write `envoyage:lastRun`; writing anything else reverts `EACUnauthorizedAccountRoles`.
-- Web app moved from a guided walkthrough to a product: Hire a keeper (guided demo position → terms → approve/grant/publish), My mandates (live rows, revoke, name actions), Bot, Lookup by ENS name, Home. The walkthrough with the live theft demo (same calldata drains a naive contract, mines a failed tx against Envoyage) stays as the Proof tab.
+**Yes** — Judging Round 2 is Mon 14 Sep, 23:00 WIB.
 
-**What's landing today (Fri)**
+## Are you on track for submitting a project?
 
-- App finishing pass and public URL; author walkthrough with real wallets.
+**Yes**
 
-**Biggest challenge right now**
+## Are there any prizes in particular you're going for?
 
-- Making the three integrations *legible in the interface*. The system works end to end — the bot takes its task list from The Graph, compounds on Uniswap, and writes its one permitted ENS record — but on screen these read as labels next to buttons rather than as a system a viewer understands. Same for the UI/UX: it went from a guided walkthrough to a working app overnight (hire, my mandates, bot, lookup), and the flow now needs a design pass so a first-time viewer gets it without narration. That's today's work.
+Select (max 3 partner prizes):
 
-**What's blocked / needs a decision**
+1. **Uniswap** — Best Uniswap Stack Contribution
+2. **ENS** — Best Use of ENSv2
+3. **The Graph** — one track only *(decide today: the subgraph is the keeper's task
+   source, which argues the build/tooling track; the UI also composes our subgraph
+   with Uniswap's own v4 subgraph, which argues the composable track. Pick one.)*
 
-- Uniswap Developer Feedback Form (qualification requirement) — author submitting today.
-- Which Graph track to enter (build vs composable) — one pick, deciding today.
+## What progress did you make since the last check-in?
 
-**Demo plan**
+Envoyage is a permission layer for Uniswap v4 automation: an LP can hire a keeper bot
+without handing it the power to steal. The bot gets a mandate — one function,
+`compound(id, minFee)` — and the contract writes the Uniswap instructions itself with
+the owner's address fixed in code, plus a fee cap, a cooldown, an expiry, and instant
+revocation.
 
-- 3-minute video, Saturday. App + Proof tab, all live data on Sepolia.
+Since check-in #1:
+
+- **Contract live and verified on Sepolia** — `0x8466e82E02edF3F00c0387D5C3E66d407dc7259C`, 38 tests, `forge lint` clean, immutable (no admin, no upgrade path, no `delegatecall` in the deployed bytecode).
+- **The whole loop now runs unattended.** A reference keeper and a fee-generating swap loop run under pm2 on a VPS: the bot asks our subgraph which mandates name it, compounds on Uniswap v4, and writes its one permitted ENS record — every ~2 minutes, across two live mandates, with no human involved. Verified by reading `38896.envoyage.eth` back through the ENS resolver.
+- **Two subgraphs.** Sepolia (mandates, executions, and a census of every approval ever granted on Uniswap v4's PositionManager) and a **mainnet census** that counts 1,440+ unbounded delegations over real positions — and zero scoped ones, because no bounded alternative exists there yet.
+- **ENSv2 with real access control.** Every mandate is a subname whose text records are its terms. Enhanced Access Control gives the keeper write permission to exactly one key, `envoyage:lastRun`; writing any other record reverts `EACUnauthorizedAccountRoles`.
+- **The web app went from a guided walkthrough to a working product**: Hire a keeper (get a demo position → set terms → approve, grant, publish), My mandates (live rows, revoke, ENS name actions), Bot, Lookup by ENS name, and Home. 45 tests.
+- **A live adversarial demo**, kept as a Proof tab: the same attack calldata is sent to two contracts from the same wallet. Against a deliberately vulnerable comparator it drains the position; against Envoyage it mines a failed transaction, because no function exists to receive it. Two Etherscan links, opposite outcomes.
+
+## Any blockers? Need help?
+
+No hard blockers. One open question we'd take advice on: **which of The Graph's tracks
+best fits a subgraph that is a live automation's task source rather than a read-only
+analytics layer** — our keeper takes its work queue from the subgraph, so deleting it
+stops the bot, and separately the UI composes our subgraph with Uniswap's own v4
+subgraph through the Gateway.
+
+## Is there anything else you think we should know?
+
+Today's focus is a design pass, and it is our biggest challenge: the three
+integrations are *working* but not yet *legible in the interface*. The bot genuinely
+takes its task list from The Graph, compounds on Uniswap, and writes its one
+permitted ENS record — but on screen those read as labels beside buttons rather than
+as one system a first-time viewer can follow without narration. Same for the app
+itself, which went from a walkthrough to a product overnight and now needs its flow
+tightened.
+
+Everything is live on Sepolia and nothing in the demo is a fixture — the numbers on
+screen are read from the chain, the subgraph, and the ENS resolver at page load.
+Demo video is recorded Saturday.
