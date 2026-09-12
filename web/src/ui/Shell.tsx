@@ -41,11 +41,17 @@ export function Shell({render}: {render: (route: string, go: (r: string) => void
 
   useEffect(() => {
     if (!account || redirected.current === account) return;
-    redirected.current = account;
     // Only from Home. This used to fire from the landing route, which is now
     // Proof — so connecting a wallet during the demo would have bounced the
     // presenter off the opening screen mid-sentence.
+    //
+    // The route check comes BEFORE the one-shot ref is consumed, and `route` is
+    // in the deps. With the ref set first, connecting on Proof (which is now
+    // where people connect) burned the one shot and the rule could never fire
+    // again for that account — inert, and wallet-gated, so nothing would have
+    // caught it.
     if (route !== "how") return;
+    redirected.current = account;
     fetchMandatesByGrantor(account)
       .then((d) => {
         if (d.mandates.length > 0 && window.location.hash.replace(/^#\/?/, "") === "how") go("mandates");
@@ -54,7 +60,7 @@ export function Shell({render}: {render: (route: string, go: (r: string) => void
         /* the subgraph being down must not block landing */
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [account]);
+  }, [account, route]);
 
   return (
     <div className="page">

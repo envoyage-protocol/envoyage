@@ -619,10 +619,16 @@ a.chip:hover {
   justify-content: center;
   padding: 24px;
 }
+/* The dialog sits on --well, not --paper. In dark the page ground is #000 and so
+   is --paper, so a --paper dialog over a --paper page leaves a 1px border doing
+   all the separating. (The scrim still earns its keep in dark — it cannot darken
+   a black ground, but it does drop the text behind it, measured, from #434342 to
+   #1E1E1E — it just cannot substitute for the dialog having a ground of its
+   own.) */
 .confirm {
   width: 100%;
   max-width: 620px;
-  background: var(--paper);
+  background: var(--well);
   border: 1px solid var(--ink);
   max-height: 88vh;
   overflow: auto;
@@ -685,11 +691,18 @@ a.chip:hover {
   flex-direction: column;
   gap: 8px;
 }
+/* min-width:0 so a long step label wraps instead of forcing the flex row wider
+   than the dialog — the retire step carries a full "<tokenId>.envoyage.eth". */
 .confirm-steps li {
   display: flex;
   gap: 12px;
   font-size: 14px;
   line-height: 1.45;
+  min-width: 0;
+}
+.confirm-steps li span:not(.num) {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .confirm-steps li .num {
   font-family: var(--mono);

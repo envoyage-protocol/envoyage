@@ -1,5 +1,7 @@
 import {FitDiagram} from "./FitDiagram";
 import {Overview} from "./Overview";
+import {REFERENCE_KEEPER} from "../lib/config";
+import {short} from "./kit";
 
 /// What it is → what a mandate is → how the three registries fit → the worked
 /// example, the ledger and the census (Overview).
@@ -58,8 +60,16 @@ export function Home({go}: {go: (r: string) => void}) {
             <span className="caps">What you sign here</span>
             <h3>A mandate</h3>
             <span className="compare-label">it says</span>
+            {/* Every value here is real and stable: the keeper comes from config,
+                and #38896 / 2% are mandate No. 1's own pinned terms (a mandate's
+                terms are never mutable after the grant). The cooldown is stated
+                as a shape rather than a number — the design mock said "every 5
+                minutes" where the live record resolves 60, and a fabricated
+                figure two sections above a card that invites you to check it
+                against ENS is the one mistake this page cannot afford. */}
             <p className="compare-quote">
-              “0x9b71…0de2 may call compound on #38896, keep at most 2% of what it harvests, once every 5 minutes, until it expires.”
+              “{short(REFERENCE_KEEPER)} may call compound on #38896, keep at most 2% of what it harvests, no more than once per cooldown, until
+              it expires.”
             </p>
             <span className="compare-label">which permits</span>
             <ul className="compare-list">
