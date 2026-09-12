@@ -17,15 +17,29 @@ function Proof() {
   const theft = useTheft();
   return (
     <div className="walk">
-      <section className="lede" aria-labelledby="w-h">
-        <h1 id="w-h">
-          You own a Uniswap v4 position. You want a bot to <em>compound</em> its fees.
-        </h1>
-        <p>Here is what happens with the only tool that exists today — and with a mandate instead.</p>
-        <p className="plain">
-          Three steps, in order. Every button sends a real transaction to Sepolia, and every outcome links to
-          Etherscan. Your wallet plays the bot; where a step needs the owner, it says so.
-        </p>
+      {/* The headline is a claim about the reader, not a setup. "You own a
+          position, you want a bot" spent two sentences arriving at the point;
+          this IS the point, and it is true of everyone who has ever approved an
+          automation contract. The three acts are named up front so a viewer
+          knows the shape before committing to it — this screen is the first
+          thing anyone sees, and it has about three seconds. */}
+      <section className="lede proof-lede" aria-labelledby="w-h">
+        <div>
+          <p className="eyebrow mono">start here — two minutes</p>
+          <h1 id="w-h">Every automation bot you approve today can take your position.</h1>
+          <p>
+            Not a hypothetical. Below, the same bot sends the same instruction to two contracts. One pays you. One drains you.{" "}
+            <strong>Run both yourself</strong> — any wallet with Sepolia ETH will do, you do not need ours.
+          </p>
+        </div>
+        <aside className="acts" aria-label="The three acts">
+          <p className="eyebrow mono">the three acts</p>
+          <ol>
+            <li>The theft, on a live testnet</li>
+            <li>The same theft, refused by a mandate</li>
+            <li>The owner ends it, mid-flight</li>
+          </ol>
+        </aside>
       </section>
       <OldWay t={theft} />
       <KeeperActs mandateId={SACRIFICIAL_MANDATE_ID} theftSide={<MandateTheft t={theft} />} />

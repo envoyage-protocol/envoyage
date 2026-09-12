@@ -102,9 +102,6 @@
     --graph: #9b85ff;
     --ens: #6fb0f7;
   }
-  .brand img {
-    filter: none;
-  }
 }
 
 *,
@@ -177,7 +174,7 @@ b {
 
 /* ── page & letterhead ──────────────────────────────────────────────────── */
 .page {
-  max-width: 1120px;
+  max-width: 1220px;
   margin: 0 auto;
   padding: 0 clamp(16px, 3vw, 32px) 64px;
 }
@@ -210,21 +207,16 @@ b {
   font: inherit;
   cursor: pointer;
 }
-.brand .plate {
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
+/* The brand mark, drawn in CSS. Two sides of a bracket: a thick left edge and a
+   thin box, which reads as the corner of a frame — a scope. It uses the amber
+   token, so it is correct in both themes with no filter and no second asset. */
+.brand .mark {
+  width: 22px;
+  height: 22px;
   flex: none;
-}
-/* The logo is warm white on transparent, drawn for dark grounds. Inverting turns the
-   white E to ink; the hue rotation brings the inverted (blue) arc back to amber. */
-.brand img {
-  width: 32px;
-  height: 32px;
   display: block;
-  object-fit: contain;
-  filter: invert(1) hue-rotate(180deg) saturate(1.4) contrast(1.1);
+  border: 2px solid var(--amber-fill);
+  border-left-width: 6px;
 }
 .brand .word {
   font-family: var(--display);
@@ -723,6 +715,93 @@ a.chip:hover {
   gap: 12px;
   justify-content: flex-end;
   flex-wrap: wrap;
+}
+
+
+/* ── proof: the opening ─────────────────────────────────────────────────── */
+/* Headline left, the three acts right, so the shape of what follows is visible
+   without scrolling. The old lede ran the full measure and pushed act 1 below
+   the fold. */
+.proof-lede {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: 48px;
+  align-items: end;
+  padding: clamp(32px, 5vw, 56px) 0 clamp(24px, 4vw, 40px);
+}
+.proof-lede h1 {
+  margin: 0 0 14px;
+  font-size: clamp(32px, 4.2vw, 52px);
+  line-height: 1.04;
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  text-wrap: balance;
+  max-width: none;
+}
+.proof-lede > div > p {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.55;
+  max-width: 60ch;
+  text-wrap: pretty;
+}
+.eyebrow {
+  margin: 0 0 14px;
+  font-size: 12.5px;
+  color: var(--ink-muted);
+}
+.acts {
+  border-left: 2px solid var(--rule);
+  padding-left: 24px;
+}
+.acts ol {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 15px;
+  line-height: 1.9;
+}
+@media (max-width: 860px) {
+  .proof-lede {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+    align-items: start;
+  }
+}
+
+
+/* The instruction, full width, with the one changed argument coloured. --well so
+   it reads as a recessed panel of machine text rather than another card. */
+.calldata {
+  margin: 20px 0 0;
+  border: 1px solid var(--rule);
+  background: var(--well);
+}
+.calldata pre {
+  margin: 0;
+  padding: 18px 20px;
+  overflow-x: auto;
+}
+.calldata code {
+  font-family: var(--mono);
+  font-size: 13.5px;
+  line-height: 1.7;
+  white-space: pre;
+}
+.calldata .was {
+  color: var(--ok);
+  font-weight: 500;
+}
+.calldata .now {
+  color: var(--bad);
+  font-weight: 600;
+}
+.calldata figcaption {
+  border-top: 1px solid var(--rule);
+  padding: 12px 20px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink-muted);
+  text-wrap: pretty;
 }
 
 /* ── exhibits (section heads) ───────────────────────────────────────────── */

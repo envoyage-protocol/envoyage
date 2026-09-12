@@ -19,6 +19,10 @@
 # (10.32:1), but a token that is only safe in one theme is not a token. Measured,
 # not assumed — #C46A00 clears 3:1 on paper, well AND wash.
 #
+# NB: a label may not contain a comma. contrast.mjs splits each argument on ",",
+# so a comma inside the label lands in the `min` slot, becomes NaN, and the pair
+# FAILS with a passing ratio printed beside it — confusing, but at least loud.
+#
 # NOT listed, deliberately: --rule and --soft hairlines. They are decorative
 # separators between already-separated content, not meaningful non-text content,
 # so 1.4.11 does not apply. Listing them at a lowered minimum would be gaming the
@@ -34,6 +38,8 @@ cd "$(dirname "$0")" && node contrast.mjs \
   "#8A4A00,#F6F6F4,light amber text on well" \
   "#8A4A00,#FFF3E0,light amber text on wash" \
   "#0E7A3C,#FFFFFF,light ok on paper" \
+  "#0E7A3C,#F6F6F4,light ok on well — calldata honest recipient" \
+  "#B3261E,#F6F6F4,light bad on well — calldata theft recipient" \
   "#9A5B00,#FFFFFF,light warn on paper" \
   "#B3261E,#FFFFFF,light bad on paper" \
   "#B3261E,#FFF3E0,light bad on wash" \
@@ -60,6 +66,8 @@ cd "$(dirname "$0")" && node contrast.mjs \
   "#FFC061,#111110,dark amber text on well" \
   "#FFC061,#241708,dark amber text on wash" \
   "#4FD684,#000000,dark ok on paper" \
+  "#4FD684,#111110,dark ok on well — calldata honest recipient" \
+  "#FF7A70,#111110,dark bad on well — calldata theft recipient" \
   "#F2B04F,#000000,dark warn on paper" \
   "#FF7A70,#000000,dark bad on paper" \
   "#FF7A70,#241708,dark bad on wash" \

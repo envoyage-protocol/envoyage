@@ -52,9 +52,14 @@ export function Shell({render}: {render: (route: string, go: (r: string) => void
       </a>
       <header className="masthead">
         <button className="brand" onClick={() => go("")} aria-label="Envoyage home">
-          <span className="plate" aria-hidden="true">
-            <img src="/logo.png" alt="" width={32} height={32} />
-          </span>
+          {/* Drawn, not loaded. logo.png is 1506x1044 and 600KB, and it only ever
+              rendered here at 32px — where an illustration that detailed turns to
+              mush. In dark it collapsed into an unreadable orange smear, because
+              the two themes applied different filters to art that was built for
+              one of them. A bracket in the brand amber is legible at any size,
+              needs no filter, costs no bytes, and follows the token into both
+              themes on its own. */}
+          <span className="mark" aria-hidden="true" />
           <span className="word">
             Envoyage
             <small>Scoped keeper mandates · Uniswap v4</small>

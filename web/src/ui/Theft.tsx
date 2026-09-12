@@ -221,6 +221,28 @@ export function OldWay({t}: {t: TheftFlow}) {
         </div>
         {!t.ready && <TheftGate t={t} />}
       </article>
+
+      {/* The two presses differ by ONE argument, and until now the page asserted
+          that in prose while never showing it. This is the single strongest
+          artifact in the project, so it gets the full width and the difference
+          is coloured rather than described. Both addresses are read from the
+          flow — the owner from ownerOf, the thief from the connected wallet —
+          so a judge sees their OWN address in the line that does the stealing. */}
+      <figure className="calldata" aria-label="The instruction, and the one field that changes">
+        <pre>
+          <code>
+            {`DECREASE_LIQUIDITY(${NAIVE_VICTIM_TOKEN_ID.toString()}, 0, …)\n`}
+            {"TAKE_PAIR(EDB, EDA, "}
+            <b className="was">{t.victimOwner ? short(t.victimOwner) : "the owner"}</b>
+            {")"}
+          </code>
+        </pre>
+        <figcaption>
+          the honest call. The theft changes exactly one argument — the recipient becomes{" "}
+          <b className="now">{t.thief ? short(t.thief) : "the bot"}</b>, the wallet you are connected with. Everything else is byte for byte
+          identical, and Uniswap cannot tell the two apart because an approval never carried the difference.
+        </figcaption>
+      </figure>
     </section>
   );
 }
