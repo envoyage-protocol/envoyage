@@ -264,7 +264,11 @@ export function KeeperActs({mandateId = DEMO_MANDATE_ID, theftSide}: {mandateId?
           phase: "failed",
           note: (
             <>
-              Refused before it was sent: <b>{REFUSAL_REASONS[r] ?? `reason ${r}`}</b>. Read from{" "}
+              {/* No full stop after the reason: every string in REFUSAL_REASONS
+                  already ends in one, so this rendered "…has been revoked.."
+                  — in the closing line of act 3, which is the last thing the
+                  demo video shows. The fallback gets its own. */}
+              Refused before it was sent: <b>{REFUSAL_REASONS[r] ?? `reason ${r}.`}</b> Read from{" "}
               <code className="mono">canCompound()</code>; a real send would revert with the same selector.
             </>
           )

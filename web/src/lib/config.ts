@@ -73,7 +73,15 @@ export const REFERENCE_KEEPER = "0xd643ee841bf365E4d5f46Bb9072B18a4cD056C5B" as 
 /// The mandate the Proof tab may revoke. Mandate #1 is permanent and is never
 /// revoked by any screen; this one lives on its own position and is re-granted
 /// between takes. Set by the operator after granting it.
-export const SACRIFICIAL_MANDATE_ID = 2n;
+///
+/// Was 2n. Mandate #2 was revoked on 12 Sep 2026 while verifying act 3 end to
+/// end, and re-granting position #39152 necessarily produces a NEW id — the
+/// contract never reuses one. Act 3 is driven by this constant, so leaving it at
+/// a revoked id makes the Proof tab open on "already revoked" and the revoke
+/// beat cannot be performed at all.
+///
+/// **After every act-3 take, re-grant #39152 and set this to the new id.**
+export const SACRIFICIAL_MANDATE_ID = 4n;
 
 /// Contract limit on the keeper's share of harvested fees, in bps.
 export const MAX_FEE_BPS = 1000;
