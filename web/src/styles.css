@@ -754,19 +754,16 @@ a.chip:hover {
 }
 
 /* ── the paper sheet ────────────────────────────────────────────────────── */
+/* The offset drop-shadow and the inset second border were a printed-sheet
+   affectation: together they read as a doubled edge, which on a control panel
+   looks like a rendering artifact rather than paper. The mandate card keeps its
+   instrument character from its STRUCTURE — docket, articles, signatories,
+   seal — not from a shadow under it. */
 .sheet {
   position: relative;
   background: var(--paper);
   border: 1px solid var(--ink);
-  box-shadow: 4px 4px 0 var(--rule);
   padding: var(--sheet-pad);
-}
-.sheet::before {
-  content: "";
-  position: absolute;
-  inset: 6px;
-  border: 1px solid var(--rule);
-  pointer-events: none;
 }
 
 .docket {
@@ -1168,21 +1165,36 @@ p.pending {
 .records dl {
   margin: 0;
 }
+/* 180px fits "envoyage:minInterval", the longest record key, at 14px mono.
+   Narrower and it breaks mid-word into "minInterva / l", which makes a resolver
+   key look like a typo in the very thing we are asking the reader to audit.
+   A FIXED width rather than max-content because each row is its own grid, so
+   max-content sizes per row and the values stop lining up in a column — and
+   these are records someone is meant to read down and compare. */
 .records dl > div {
   display: grid;
-  grid-template-columns: minmax(120px, 0.7fr) 1fr;
+  grid-template-columns: 180px minmax(0, 1fr);
   gap: 8px 16px;
   padding: 10px 0;
   border-bottom: 1px solid var(--rule);
 }
+@media (max-width: 560px) {
+  .records dl > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}
 .records dl > div:first-child {
   border-top: 1px solid var(--ink);
 }
+/* No overflow-wrap here: the keys are a known, short set and must stay intact.
+   The value below still wraps anywhere, because an address legitimately has no
+   break points. */
 .records dt {
   font-family: var(--mono);
   font-size: 14px;
   color: var(--ink-muted);
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 .records dd {
   margin: 0;
