@@ -52,14 +52,16 @@ export function Shell({render}: {render: (route: string, go: (r: string) => void
       </a>
       <header className="masthead">
         <button className="brand" onClick={() => go("")} aria-label="Envoyage home">
-          {/* Drawn, not loaded. logo.png is 1506x1044 and 600KB, and it only ever
-              rendered here at 32px — where an illustration that detailed turns to
-              mush. In dark it collapsed into an unreadable orange smear, because
-              the two themes applied different filters to art that was built for
-              one of them. A bracket in the brand amber is legible at any size,
-              needs no filter, costs no bytes, and follows the token into both
-              themes on its own. */}
-          <span className="mark" aria-hidden="true" />
+          {/* The real mark, at 512x512 square — the old logo.png was 1506x1044, so
+              object-fit shrank it to roughly 32x22 and it turned to mush.
+              Rendered at three sizes on both grounds, this artwork is excellent
+              on black down to 24px and ILLEGIBLE on white, because the "E" is
+              warm white: it was drawn for dark grounds, exactly as UI-REVIEW
+              says. So light mode gives it the ground it wants — an ink plate —
+              instead of a filter that inverts the brand's own colours. */}
+          <span className="plate" aria-hidden="true">
+            <img src="/logo-mark.png" alt="" width={32} height={32} />
+          </span>
           <span className="word">
             Envoyage
             <small>Scoped keeper mandates · Uniswap v4</small>
