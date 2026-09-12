@@ -24,7 +24,12 @@ module.exports = {
       cwd: __dirname,
       script: "npx",
       args: "tsx src/swap-loop.ts",
-      env: {...env, SWAP_CADENCE_MS: "120000"},
+      // 30 min, not 2. At a 2-minute cadence with a 60-second mandate cooldown the
+      // keeper compounded ~120x/hour across two mandates and spent its whole balance
+      // overnight (246 executions, ~0.09 ETH). Fee accrual is what gates compounding,
+      // so the swap cadence is the throttle for the entire system.
+      // For recording, restart this one process with SWAP_CADENCE_MS=60000.
+      env: {...env, SWAP_CADENCE_MS: "1800000"},
       autorestart: true,
       restart_delay: 10000,
       max_restarts: 50
