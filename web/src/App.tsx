@@ -63,10 +63,15 @@ function Screens(route: string, go: (r: string) => void) {
       );
     case "lookup":
       return <Lookup />;
+    case "how":
+      return <Home go={go} />;
+    // "" is the landing route and "demo" is its alias, so links already written
+    // against #/demo keep resolving after Proof moved to the front.
+    case "":
     case "demo":
       return <Proof />;
     default:
-      return <Home go={go} />;
+      return <Proof />;
   }
 }
 

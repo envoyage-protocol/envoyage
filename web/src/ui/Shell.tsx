@@ -6,13 +6,17 @@ import {WalletBar} from "./WalletBar";
 import {NetworkBanner} from "./NetworkBanner";
 import {short} from "./kit";
 
+/// Proof first, deliberately. The spine of the demo is the theft, then the mandate
+/// that stops it, then hiring one — so the landing route ("") is the Proof screen
+/// and the explanation lives at "how". "demo" stays as an alias for "" so every
+/// link already written against #/demo keeps resolving.
 export const ROUTES = [
-  ["", "Home"],
+  ["", "Proof"],
+  ["how", "How it works"],
   ["hire", "Hire a keeper"],
   ["mandates", "My mandates"],
   ["bot", "Bot"],
-  ["lookup", "Lookup"],
-  ["demo", "Proof"]
+  ["lookup", "Lookup"]
 ] as const;
 export type Route = (typeof ROUTES)[number][0];
 
@@ -38,10 +42,13 @@ export function Shell({render}: {render: (route: string, go: (r: string) => void
   useEffect(() => {
     if (!account || redirected.current === account) return;
     redirected.current = account;
-    if (route !== "") return;
+    // Only from Home. This used to fire from the landing route, which is now
+    // Proof — so connecting a wallet during the demo would have bounced the
+    // presenter off the opening screen mid-sentence.
+    if (route !== "how") return;
     fetchMandatesByGrantor(account)
       .then((d) => {
-        if (d.mandates.length > 0 && window.location.hash.replace(/^#\/?/, "") === "") go("mandates");
+        if (d.mandates.length > 0 && window.location.hash.replace(/^#\/?/, "") === "how") go("mandates");
       })
       .catch(() => {
         /* the subgraph being down must not block landing */
@@ -66,9 +73,10 @@ export function Shell({render}: {render: (route: string, go: (r: string) => void
         </button>
         <div className="masthead-right">
           <Nav route={route} go={go} />
-          <p className="chain">
-            <span className="dot" aria-hidden="true" /> Sepolia ·{" "}
-            <a className="mono" href={`${EXPLORER}/address/${ENVOYAGE}#code`} target="_blank" rel="noreferrer">
+          <p className="chip chain">
+            <i className="dot" aria-hidden="true" />
+            Sepolia
+            <a href={`${EXPLORER}/address/${ENVOYAGE}#code`} target="_blank" rel="noreferrer">
               {short(ENVOYAGE)}
             </a>
           </p>

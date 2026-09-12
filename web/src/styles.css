@@ -182,30 +182,28 @@ b {
   padding: 0 clamp(16px, 3vw, 32px) 64px;
 }
 
+/* The masthead is sticky: on a page you operate, the nav and the wallet must stay
+   reachable while you read a ledger. The double rule underneath it was a
+   letterhead affectation and is gone. */
 .masthead {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: space-between;
-  gap: 16px 32px;
+  gap: 12px 28px;
   flex-wrap: wrap;
-  padding: 18px 0 14px;
-  border-bottom: 1px solid var(--ink);
-  position: relative;
-}
-.masthead::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -4px;
-  border-bottom: 1px solid var(--ink);
+  padding: 0;
+  border-bottom: 1px solid var(--rule);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--paper);
 }
 
 .brand {
   display: inline-flex;
   align-items: center;
   gap: 12px;
-  padding: 0;
+  padding: 10px 0;
   border: 0;
   background: none;
   color: inherit;
@@ -213,8 +211,8 @@ b {
   cursor: pointer;
 }
 .brand .plate {
-  width: 44px;
-  height: 44px;
+  width: 32px;
+  height: 32px;
   display: grid;
   place-items: center;
   flex: none;
@@ -222,75 +220,133 @@ b {
 /* The logo is warm white on transparent, drawn for dark grounds. Inverting turns the
    white E to ink; the hue rotation brings the inverted (blue) arc back to amber. */
 .brand img {
-  width: 44px;
-  height: 44px;
+  width: 32px;
+  height: 32px;
   display: block;
   object-fit: contain;
   filter: invert(1) hue-rotate(180deg) saturate(1.4) contrast(1.1);
 }
 .brand .word {
   font-family: var(--display);
-  font-size: 24px;
+  font-size: 17px;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
 }
+/* The strapline was a letterhead subtitle. On a sticky control bar it is a second
+   line competing with the nav for the same 48px, so it is hidden rather than
+   deleted: it still reaches a screen reader as the brand's accessible name. */
 .brand .word small {
-  display: block;
-  font-size: 12px;
-  color: var(--ink-muted);
-  letter-spacing: 0.1em;
-  font-variant-caps: all-small-caps;
-  font-weight: 500;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .masthead-right {
   display: flex;
   align-items: center;
-  gap: 12px 24px;
+  gap: 10px;
   flex-wrap: wrap;
   min-width: 0;
   max-width: 100%;
 }
 
+/* Nav: text links, with the active item marked by a rule and by weight — not by a
+   box on every item. Six equally-boxed buttons gave every destination the same
+   weight, so nothing read as primary and the row competed with the logo. */
 .tabs {
   display: flex;
-  gap: 4px;
+  align-items: stretch;
+  gap: 2px;
   flex-wrap: wrap;
   min-width: 0;
 }
 .tab {
   font: inherit;
-  font-size: 15px;
-  padding: 6px 12px;
-  border: 1px solid var(--ink);
-  background: transparent;
-  color: var(--ink);
-  cursor: pointer;
-  font-variant-caps: all-small-caps;
-  letter-spacing: 0.08em;
+  font-size: 14px;
   font-weight: 500;
+  padding: 15px 12px 13px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+  letter-spacing: 0;
+  white-space: nowrap;
 }
+.tab:hover {
+  color: var(--ink);
+}
+/* Two carriers, deliberately: the amber rule AND the weight/colour shift. Colour
+   alone would make the active item unreadable to anyone who cannot separate
+   amber from the rule beneath it. --amber-mark, not --amber-fill: the fill is
+   2.52:1 on white and a 2px bar is meaningful non-text content. */
 .tab.on {
-  background: var(--ink);
-  color: var(--paper);
+  color: var(--ink);
+  font-weight: 600;
+  border-bottom-color: var(--amber-mark);
 }
 
-.chain {
-  margin: 0;
-  font-size: 14px;
-  color: var(--ink-muted);
+/* One chip shape. The network chip used to be a <p> of body text with a mono link
+   inside, and the wallet chip an all-mono <span> with a border — two different
+   constructs side by side, which will never look aligned however they are nudged. */
+.chip {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
+  border: 1px solid var(--rule);
+  padding: 6px 10px;
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.2;
+  color: var(--ink-muted);
+  background: transparent;
+  white-space: nowrap;
+}
+.chip a {
+  color: inherit;
+}
+/* The wallet is the only interactive thing in this corner, so it carries an ink
+   edge the passive network chip does not. Both the button and the anchor form of
+   it, or "get a wallet" reads as the weaker of the two when it is the only thing
+   on the page you can actually do. */
+button.chip,
+a.chip {
+  cursor: pointer;
+  border-color: var(--ink);
+  color: var(--ink);
+  text-decoration: none;
+}
+button.chip:hover,
+a.chip:hover {
+  background: var(--well);
+}
+/* The explorer link INSIDE the passive network chip keeps its underline — it is a
+   link in a line of text, not a control. */
+.chip a:not(.chip) {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .dot {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
-  background: var(--amber);
-  display: inline-block;
+  background: var(--ok);
+  display: block;
+  flex: none;
+}
+.dot-amber {
+  background: var(--amber-mark);
+}
+.dot-bad {
+  background: var(--bad);
 }
 
+.chain {
+  margin: 0;
+}
 .wallet {
   display: inline-flex;
   align-items: center;
@@ -304,7 +360,7 @@ b {
   font-family: var(--mono);
 }
 .wallet-err {
-  color: var(--amber);
+  color: var(--bad);
 }
 
 /* ── lede ───────────────────────────────────────────────────────────────── */
