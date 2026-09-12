@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* The app's own tokens, dark scheme — the cover must look like the product,
+     not like a poster made beside it. */
+  :root{
+    --paper:#000; --ink:#ededea; --ink2:#a3a39e; --rule:#33332f; --well:#111110;
+    --amber:#ffc061; --amber-fill:#ffa02e;
+    --ok:#4fd684; --bad:#ff7a70;
+    --uni:#ff6fa8; --graph:#9b85ff; --ens:#6fb0f7;
+    --sans:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    width:1280px;height:720px;background:var(--paper);color:var(--ink);
+    font-family:var(--sans);font-variant-numeric:tabular-nums;
+    display:flex;flex-direction:column;justify-content:space-between;
+    padding:56px 64px;
+  }
+  .top{display:flex;align-items:center;gap:14px}
+  .top img{width:44px;height:44px;display:block}
+  .top .word{font-size:24px;font-weight:600;letter-spacing:-0.01em}
+  .top .tag{margin-left:auto;font-family:var(--mono);font-size:14px;color:var(--ink2)}
+
+  h1{
+    margin:0;font-size:64px;line-height:1.02;font-weight:600;
+    letter-spacing:-0.025em;max-width:19ch;text-wrap:balance;
+  }
+  h1 em{font-style:normal;color:var(--amber-fill)}
+  .sub{margin:18px 0 0;font-size:19px;line-height:1.5;color:var(--ink2);max-width:62ch}
+
+  /* The argument, as two receipts. Same selector, two contracts, opposite ends. */
+  .proof{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .card{border:1px solid var(--rule);background:var(--well);padding:18px 20px}
+  .card .to{font-family:var(--mono);font-size:13px;color:var(--ink2)}
+  .card .sel{font-family:var(--mono);font-size:15px;margin:8px 0 12px}
+  .card .verdict{font-size:20px;font-weight:600}
+  .card.drained{border-color:var(--bad)}
+  .card.drained .verdict{color:var(--bad)}
+  .card.refused{border-color:var(--ok)}
+  .card.refused .verdict{color:var(--ok)}
+  .card .note{margin-top:6px;font-size:13.5px;color:var(--ink2);line-height:1.45}
+
+  .foot{display:flex;align-items:center;gap:22px;font-family:var(--mono);font-size:13.5px;color:var(--ink2)}
+  .foot i{width:9px;height:9px;display:block}
+  .foot span{display:inline-flex;align-items:center;gap:7px}
+</style>
+</head>
+<body>
+  <div class="top">
+    <img src="logo-mark.png" alt="">
+    <span class="word">Envoyage</span>
+    <span class="tag">a permission layer for Uniswap v4 automation</span>
+  </div>
+
+  <div>
+    <h1>Every automation bot you approve today can <em>take your position</em>.</h1>
+    <p class="sub">An approval says <b>which</b> position a bot may touch — never <b>what</b> it may do. A mandate says what, and the contract enforces it.</p>
+  </div>
+
+  <div class="proof">
+    <div class="card drained">
+      <div class="to">the instruction → an ordinary approval</div>
+      <div class="sel">0x59efcb15</div>
+      <div class="verdict">Position drained</div>
+      <div class="note">The contract forwarded it. Nothing on chain objected, because nothing could.</div>
+    </div>
+    <div class="card refused">
+      <div class="to">the same bytes → Envoyage</div>
+      <div class="sel">0x59efcb15</div>
+      <div class="verdict">Refused on chain</div>
+      <div class="note">A mined, failed transaction. No function exists that accepts an instruction.</div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span><i style="background:var(--uni)"></i>Uniswap v4</span>
+    <span><i style="background:var(--graph)"></i>The Graph</span>
+    <span><i style="background:var(--ens)"></i>ENS v2</span>
+    <span style="margin-left:auto">live on Sepolia · 0x8466…259C · verified</span>
+  </div>
+</body>
+</html>
