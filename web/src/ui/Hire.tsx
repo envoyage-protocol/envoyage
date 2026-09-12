@@ -11,6 +11,7 @@ import {MandatePreview} from "./MandatePreview";
 import {GetDemoPosition} from "./GetDemoPosition";
 import {planHireSteps, stepSatisfied, validateTerms, type HireFacts, type HireStepId} from "./hireSteps";
 import {Sponsor, Tx, short} from "./kit";
+import {ConfirmSheet} from "./ConfirmSheet";
 
 const GAS: Record<HireStepId, bigint> = {retire: 120_000n, approve: 60_000n, grant: 220_000n, publish: 900_000n};
 
@@ -44,6 +45,7 @@ export function Hire({go}: {go: (r: string) => void}) {
   const [estimate, setEstimate] = useState<{pending: number; cost: bigint; balance: bigint} | null>(null);
   const [mandateId, setMandateId] = useState<bigint | null>(null);
   const [done, setDone] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   const terms = validateTerms({feeCapPercent: Number(feeCap), cooldownMinutes: Number(cooldown), expiryDays: Number(expiryDays)});
 
@@ -140,6 +142,20 @@ export function Hire({go}: {go: (r: string) => void}) {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [facts, account, plan.join()]);
+
+  // The labels of the steps that will ACTUALLY run, so the sheet never promises a
+  // transaction that will not happen or omits one that will. A position already
+  // approved shows two; one carrying a name from a revoked mandate shows four.
+  const pendingLabels = facts ? steps.filter((s) => !stepSatisfied(s.id as HireStepId, facts, ENVOYAGE, acct)).map((s) => s.label) : [];
+
+  // Stated from the terms as they will be written, not from the design mock: the
+  // fee recipient here is the KEEPER's own address, so its cut leaves the
+  // position and the remainder is reinvested. Saying "everything goes to you"
+  // would be a pleasant sentence about a different contract.
+  const sentence =
+    selected === null || !terms.ok
+      ? null
+      : `The keeper ${short(REFERENCE_KEEPER)} may call compound on position #${selected.toString()}, keep at most ${terms.maxFeeBps / 100}% of the fees it harvests, no more than once every ${Number(terms.minInterval) / 60} minutes, until ${new Date(Number(terms.expiry) * 1000).toUTCString()}. Everything it does not keep is reinvested into your position. It can do nothing else, and you can revoke at any time.`;
 
   const previewTerms = {
     tokenId: selected,
@@ -282,8 +298,8 @@ export function Hire({go}: {go: (r: string) => void}) {
           )}
           {steps.length > 0 && <StepRunner steps={steps} state={runner} />}
           <div style={{marginTop: 16}}>
-            <button className="act act-primary" onClick={runner.start} disabled={steps.length === 0 || runner.running || !terms.ok || !onSepolia}>
-              {runner.running ? "Working…" : "Hire the bot"}
+            <button className="act act-primary" onClick={() => setConfirming(true)} disabled={steps.length === 0 || runner.running || !terms.ok || !onSepolia}>
+              {runner.running ? "Working…" : "Review and sign"}
             </button>
             {runner.complete && steps.length > 0 && !done && (
               <span className="gate" style={{marginLeft: 12}}>
@@ -301,6 +317,41 @@ export function Hire({go}: {go: (r: string) => void}) {
           </div>
         </article>
       </section>
+
+      <ConfirmSheet
+        open={confirming}
+        title="Confirm what you are granting"
+        body={sentence ?? "Pick a position first."}
+        steps={pendingLabels}
+        note={
+          <>
+            {estimate ? (
+              <>
+                About <span className="num">{Number(formatEther(estimate.cost)).toFixed(4)} ETH</span> in gas at the current price
+                {estimate.balance < estimate.cost ? (
+                  <>
+                    {" "}
+                    — more than this wallet's <span className="num">{Number(formatEther(estimate.balance)).toFixed(4)} ETH</span>.
+                  </>
+                ) : (
+                  "."
+                )}{" "}
+              </>
+            ) : (
+              // Never a fabricated number: if the estimate read failed, the sheet
+              // says so rather than showing a plausible-looking zero.
+              <>The gas estimate could not be read, so it is not shown. </>
+            )}
+            Declining any step leaves the earlier ones in place; reopening this screen resumes from the first incomplete one.
+          </>
+        }
+        cta="Sign in wallet"
+        onCancel={() => setConfirming(false)}
+        onConfirm={() => {
+          setConfirming(false);
+          runner.start();
+        }}
+      />
     </div>
   );
 }

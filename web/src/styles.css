@@ -608,6 +608,110 @@ a.chip:hover {
   }
 }
 
+/* ── confirm sheet ──────────────────────────────────────────────────────── */
+.sheet-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.confirm {
+  width: 100%;
+  max-width: 620px;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  max-height: 88vh;
+  overflow: auto;
+}
+.confirm:focus {
+  outline: none;
+}
+.confirm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--rule);
+}
+.confirm-head h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+}
+.confirm-x {
+  background: none;
+  border: 0;
+  color: var(--ink-muted);
+  font-family: var(--mono);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+.confirm-x:hover {
+  color: var(--ink);
+}
+.confirm-body {
+  padding: 22px;
+}
+/* The sentence is the point of the sheet, so it is set at reading size rather
+   than as fine print under a button. */
+.confirm-sentence {
+  margin: 0 0 20px;
+  font-size: 17px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+.confirm-steps {
+  border-top: 1px solid var(--rule);
+  padding-top: 16px;
+}
+.confirm-steps-cap {
+  display: block;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--ink-muted);
+  margin-bottom: 10px;
+}
+.confirm-steps ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.confirm-steps li {
+  display: flex;
+  gap: 12px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.confirm-steps li .num {
+  font-family: var(--mono);
+  color: var(--ink-muted);
+  flex: none;
+}
+.confirm-note {
+  margin: 16px 0 0;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-muted);
+}
+.confirm-foot {
+  padding: 16px 22px;
+  border-top: 1px solid var(--rule);
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
 /* ── exhibits (section heads) ───────────────────────────────────────────── */
 .exhibit {
   margin-top: clamp(48px, 7vw, 88px);
