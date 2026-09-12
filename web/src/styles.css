@@ -1,39 +1,76 @@
-@import url("https://fonts.googleapis.com/css2?family=Averia+Serif+Libre:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=IBM+Plex+Mono:wght@400;500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap");
 /* ─────────────────────────────────────────────────────────────────────────────
-   Envoyage — "The Instrument"
-   A mandate is a limited power of attorney. The page is the desk; the mandate is
-   a paper instrument that sits on it, with articles, signatories and a seal. The
-   rest of the content is filed as exhibits to that instrument.
+   Envoyage — a control surface for a security primitive
 
-   Palette: the 21st "Amber Minimal" theme (serafimcloud) mapped onto ink, paper
-   (sheet and desk) and ONE amber, for light and dark via prefers-color-scheme,
-   no toggle. The theme's primary amber is a fill inside an ink edge; amber text,
-   strikes and the seal use its accent-foreground. Every pair in both schemes is
-   measured by scripts/contrast-pairs.sh (23 pairs, all ≥ 4.5, graphics ≥ 3).
+   The old direction was "a paper legal instrument", chosen when this page was a
+   document you READ. It is now an app you OPERATE: connect, pick a position, set
+   terms, sign three transactions, watch a list, revoke. A legal-document skin on
+   a control panel is a mismatch, and it fights what the product sells — this bot
+   may do exactly one thing, capped, timed, revocable. Hand-drawn paper connotes
+   the opposite.
 
-   Type: Averia Serif Libre (300/400/700 + italics) via Google Fonts @import with
-   a serif fallback stack, for text and display alike; IBM Plex Mono for
-   addresses, hashes and figures.
+   So: the instrument metaphor survives in exactly ONE place — the mandate card /
+   preview, where a document genuinely is the subject. Everything else is a
+   clean, dense, high-contrast control surface. Separation is by RULE, not by
+   fill: the page ground and a card ground are the same paper, and a card is what
+   has an ink edge around it.
+
+   Type: IBM Plex Sans for text and display, IBM Plex Mono for addresses, hashes
+   and figures. Plex has true tabular figures, which this interface needs — it is
+   full of numbers that must line up (liquidity, fee caps, block numbers,
+   cooldowns). The previous face had none.
+
+   Colour: ONE amber, from the logo, in three roles that are NOT interchangeable
+   (see below). Three source colours — Uniswap pink, Graph violet, ENS blue —
+   appear only on edges and labels, never as a fill, so the diagram's edges and
+   the section that names them are keyed to each other.
+
+   Light and dark by prefers-color-scheme, no toggle. Every pair in both schemes
+   is measured by scripts/contrast-pairs.sh (52 pairs, text ≥ 4.5, graphics ≥ 3).
    ──────────────────────────────────────────────────────────────────────────── */
 :root {
   color-scheme: light;
 
-  /* Amber Minimal (21st.dev, serafimcloud) mapped onto the instrument's tokens.
-     The theme's primary #f59e0b is a FILL only — it fails as text on white —
-     so amber text, strikes and the seal use its accent-foreground. */
-  --desk: #f9fafb;
+  /* Grounds. --desk and --paper are deliberately the SAME: a card is defined by
+     its ink edge, not by a fill that floats it off the page. --well and
+     --rule-soft are the only recessed tints. */
+  --desk: #ffffff;
   --paper: #ffffff;
-  --ink: #262626;
-  --ink-muted: #6b7280;
-  --rule: #e5e7eb;
-  --rule-soft: #f3f4f6;
-  --amber: #92400e;
-  --amber-fill: #f59e0b;
-  --amber-fill-ink: #000000;
-  --amber-tint: #fffbeb;
+  --well: #f6f6f4;
+  --ink: #000000;
+  --ink-muted: #4a4a47;
+  --rule: #d8d8d4;
+  --rule-soft: #ecece9;
 
-  --serif: "Averia Serif Libre", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-  --display: "Averia Serif Libre", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  /* The one amber, in three roles. These are NOT interchangeable and swapping
+     them breaks contrast — each is measured separately in contrast-pairs.sh.
+       --amber       amber as TEXT            6.86:1 on paper
+       --amber-fill  amber as a BUTTON FILL   2.52:1 on paper — never text,
+                                              never a small mark
+       --amber-mark  amber as a MEANINGFUL MARK (status dot, active-nav rule)
+                     3.88:1 on paper — the fill fails 1.4.11 at that size in
+                     light, and a token safe in only one theme is not a token. */
+  --amber: #8a4a00;
+  --amber-fill: #f08a00;
+  --amber-fill-ink: #000000;
+  --amber-mark: #c46a00;
+  --amber-tint: #fff3e0;
+
+  /* Outcome colours. Every one of these is load-bearing: a failed read shows an
+     error in --bad, never a zero, and a pending state shows --warn, never an
+     empty fact. */
+  --ok: #0e7a3c;
+  --warn: #9a5b00;
+  --bad: #b3261e;
+
+  /* The three sources. Edges and labels only — never a fill. */
+  --uni: #c2185b;
+  --graph: #5b3be0;
+  --ens: #1f6fd0;
+
+  --sans: "IBM Plex Sans", system-ui, -apple-system, Segoe UI, sans-serif;
+  --serif: var(--sans);
+  --display: var(--sans);
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
   --measure: 62ch;
@@ -42,16 +79,28 @@
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --desk: #171717;
-    --paper: #262626;
-    --ink: #e5e5e5;
-    --ink-muted: #a3a3a3;
-    --rule: #404040;
-    --rule-soft: #333333;
-    --amber: #fbbf24;
-    --amber-fill: #f59e0b;
+    --desk: #000000;
+    --paper: #000000;
+    --well: #111110;
+    --ink: #ededea;
+    --ink-muted: #a3a39e;
+    --rule: #33332f;
+    --rule-soft: #1f1f1d;
+
+    --amber: #ffc061;
+    --amber-fill: #ffa02e;
     --amber-fill-ink: #000000;
-    --amber-tint: #3a2a0a;
+    /* In dark the fill clears 3:1 on its own (10.32:1), so mark == fill. */
+    --amber-mark: #ffa02e;
+    --amber-tint: #241708;
+
+    --ok: #4fd684;
+    --warn: #f2b04f;
+    --bad: #ff7a70;
+
+    --uni: #ff6fa8;
+    --graph: #9b85ff;
+    --ens: #6fb0f7;
   }
   .brand img {
     filter: none;
@@ -72,11 +121,16 @@ body {
   margin: 0;
   background: var(--desk);
   color: var(--ink);
-  font-family: var(--serif);
-  font-size: 17px;
+  font-family: var(--sans);
+  font-size: 16px;
   line-height: 1.5;
   font-optical-sizing: auto;
-  font-feature-settings: "kern", "liga", "onum";
+  /* "onum" (oldstyle figures) was the old serif direction's setting: figures that
+     hang below the baseline at varying heights. On a screen full of block
+     numbers, fee caps and cooldowns that must line up in columns, it is exactly
+     wrong. Plex's tabular figures are the reason this face was chosen. */
+  font-feature-settings: "kern", "liga";
+  font-variant-numeric: tabular-nums;
   overflow-x: hidden;
 }
 
