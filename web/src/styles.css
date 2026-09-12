@@ -208,32 +208,33 @@ b {
   cursor: pointer;
 }
 /* The logo's "E" is warm white, so on a light ground it disappears and only the
-   amber arc survives — which is what "the logo is invisible" meant. It is not a
-   sizing problem and a filter is the wrong fix: inverting turns the brand's amber
-   into something else. In light it gets an ink plate, the ground it was drawn
-   for. In dark the page ground already IS that ground, so the plate steps aside
-   and the mark sits directly on the page. */
+   amber arc survives — which is what "the logo is invisible" meant. A filter that
+   inverts would make it legible by turning the brand's amber into something else,
+   and a dark plate would put a black box in the masthead.
+   `drop-shadow` follows the PNG's alpha, so it traces the mark's own silhouette:
+   two tight passes draw an edge around the white E, and a third, softer one sits
+   it on the page. Compared against a plate and against amber glows at real size —
+   the glows read as haze at 32px, the plate reads as a box. This reads as the
+   mark. In dark the page already gives the E its contrast, so no filter runs. */
 .brand .plate {
   width: 32px;
   height: 32px;
   flex: none;
   display: grid;
   place-items: center;
-  background: var(--ink);
-  border-radius: 3px;
 }
 .brand .plate img {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   display: block;
   object-fit: contain;
+  filter: drop-shadow(0 0 0.6px rgba(0, 0, 0, 0.95)) drop-shadow(0 0 0.6px rgba(0, 0, 0, 0.95)) drop-shadow(0 1px 3px rgba(0, 0, 0, 0.28));
 }
 /* Placed AFTER the rule it overrides on purpose: same specificity, so source
-   order decides, and inside the :root block near the top it silently lost. */
+   order decides, and higher up in the file it silently lost. */
 @media (prefers-color-scheme: dark) {
-  .brand .plate {
-    background: transparent;
-    border-radius: 0;
+  .brand .plate img {
+    filter: none;
   }
 }
 .brand .word {

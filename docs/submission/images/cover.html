@@ -8,12 +8,27 @@
 <style>
   /* The app's own tokens, dark scheme — the cover must look like the product,
      not like a poster made beside it. */
+  /* Dark is the default. Adding class="light" to <body> swaps the tokens — one
+     source for both covers, so the two can never drift apart. */
   :root{
     --paper:#000; --ink:#ededea; --ink2:#a3a39e; --rule:#33332f; --well:#111110;
     --amber:#ffc061; --amber-fill:#ffa02e;
     --ok:#4fd684; --bad:#ff7a70;
     --uni:#ff6fa8; --graph:#9b85ff; --ens:#6fb0f7;
     --sans:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  }
+  body.light{
+    --paper:#fff; --ink:#000; --ink2:#4a4a47; --rule:#d8d8d4; --well:#f6f6f4;
+    /* --amber (#8a4a00) is the TEXT amber. --amber-fill is 2.52:1 on white and
+       would fail as the headline emphasis, so light uses --amber there. */
+    --amber:#8a4a00; --amber-fill:#f08a00;
+    --ok:#0e7a3c; --bad:#b3261e;
+    --uni:#c2185b; --graph:#5b3be0; --ens:#1f6fd0;
+  }
+  /* The mark's E is warm white: it needs its own edge on a light ground, the same
+     two-pass drop-shadow the masthead uses. On black it needs nothing. */
+  body.light .top img{
+    filter:drop-shadow(0 0 .8px rgba(0,0,0,.95)) drop-shadow(0 0 .8px rgba(0,0,0,.95)) drop-shadow(0 1px 4px rgba(0,0,0,.28));
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0}
@@ -32,7 +47,7 @@
     margin:0;font-size:64px;line-height:1.02;font-weight:600;
     letter-spacing:-0.025em;max-width:19ch;text-wrap:balance;
   }
-  h1 em{font-style:normal;color:var(--amber-fill)}
+  h1 em{font-style:normal;color:var(--amber)}
   .sub{margin:18px 0 0;font-size:19px;line-height:1.5;color:var(--ink2);max-width:62ch}
 
   /* The argument, as two receipts. Same selector, two contracts, opposite ends. */
