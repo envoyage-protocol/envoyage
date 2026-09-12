@@ -1,5 +1,6 @@
 import {useSession} from "../lib/session";
 import {short} from "./kit";
+import {explainWalletError} from "./walletError";
 
 /// The connected account, in the same chip shape as the network status beside it.
 /// It carries an ink edge where the network chip carries a rule, because this is
@@ -23,7 +24,11 @@ export function WalletBar() {
           get a wallet
         </a>
       )}
-      {error && <span className="wallet-err">{error}</span>}
+      {error && (
+        <span className="wallet-err" role="alert">
+          {explainWalletError(error)}
+        </span>
+      )}
     </div>
   );
 }

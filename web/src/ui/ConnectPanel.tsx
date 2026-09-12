@@ -1,4 +1,5 @@
 import {useSession} from "../lib/session";
+import {explainWalletError} from "./walletError";
 
 /// The only thing a gated screen renders without an account: a headline, one
 /// Connect button, and one line for the no-injected-wallet case.
@@ -24,7 +25,11 @@ export function ConnectPanel({headline, why}: {headline: string; why: string}) {
             or Rabby, then reload.
           </p>
         )}
-        {error && <p className="gate gate-refused">{error}</p>}
+        {error && (
+          <p className="gate gate-refused" role="alert">
+            {explainWalletError(error)}
+          </p>
+        )}
       </div>
     </section>
   );
