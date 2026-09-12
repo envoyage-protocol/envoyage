@@ -1,5 +1,15 @@
 # Demo video — shot list
 
+> **Superseded by `VIDEO-SCRIPT.md` for the ordering.** This shot list opens on
+> the census number and is terminal-first; it was written before the redesign,
+> when the browser was not yet the strongest artifact. The agreed spine is now
+> **proof first** — the theft, then the mandate that refuses it, then the machine
+> behind it — and the app's landing route is the Proof tab to match.
+>
+> What is still worth taking from this file: the `cast` verification commands
+> below. They prove the ENS records and the subgraph independently of the UI, and
+> are the right answer if a judge asks "how do I check that myself".
+
 **Target 3:00, hard ceiling 4:00.** Required by all three sponsors.
 
 Two windows only: a terminal (large font, dark) and a browser. No slides, no
