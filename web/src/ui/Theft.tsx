@@ -147,7 +147,25 @@ export function useTheft() {
   }
 
   const isKeeper = !!thief && !!keeper && sameAddress(thief, keeper);
-  const ready = !!client && !!thief && isKeeper;
+
+  // ANY connected wallet may run act 1. It used to require the keeper, so that
+  // "the same bot" was literally the same address — a storytelling nicety that
+  // cost this screen its entire purpose. The Proof tab exists so a judge can
+  // FALSIFY the claim themselves; gated on a key only the author holds, there is
+  // nothing to falsify and the page becomes a video. It also contradicted the
+  // page's own promise two paragraphs up: "Your wallet plays the bot."
+  //
+  // Nothing technical required it. NaiveUtils.execute() is `external` with no
+  // access control at all — position #39022 is approved to the CONTRACT, not to
+  // any caller, which is precisely the flaw being demonstrated. A stranger
+  // pressing "withdraw everything to itself" drains to their OWN wallet, and
+  // watching your own balance rise out of a position you never owned is a
+  // stronger demonstration than watching ours.
+  //
+  // Acts 2 and 3 keep their gates because those are enforced ON CHAIN, not here:
+  // compound reverts NotKeeper for anyone else, revoke is the grantor's alone.
+  // Those refusals are the product working, so they stay.
+  const ready = !!client && !!thief;
   return {thief, ready, keeper, isKeeper, victimOwner, honestState, naiveState, envState, preview, runNaiveHonest, runNaive, runPreview, runEnvoyage};
 }
 
@@ -242,11 +260,14 @@ export function MandateTheft({t}: {t: TheftFlow}) {
 }
 
 /// Who is needed for the theft presses: the bot, i.e. the mandate's keeper wallet.
+/// Act 1 needs a wallet and nothing else — any wallet, including yours. The only
+/// thing this can say now is "connect one", because there is no wrong one.
 function TheftGate({t}: {t: TheftFlow}) {
+  if (t.thief) return null;
   return (
     <p className="gate" role="status" style={{marginTop: 16}}>
-      {t.thief ? "Wrong wallet. " : "No wallet connected. "}
-      Switch to the keeper wallet <span className="mono">{t.keeper ? short(t.keeper) : "…"}</span> — the bot.
+      Connect any wallet with Sepolia ETH — it plays the bot. You do not need ours: the position is approved to the contract, not to a caller,
+      which is the flaw being demonstrated.
     </p>
   );
 }
