@@ -74,3 +74,22 @@ pm2 logs envoyage-keeper --lines 20
 Both read `../.env`. Balances to watch: keeper ≥ 0.005 ETH (warned at start), deployer ≥ 0.01 ETH (the loop pauses below it and says so). One round trip was measured to make `compound(1)` eligible immediately.
 
 Time to first compound for a newly granted mandate ≈ swap cadence (2 min) + keeper poll (30 s) + indexer lag.
+
+## Burn rate — read this before leaving it running
+
+`compound` only succeeds when fees have accrued, so **the swap-loop cadence throttles
+the whole system**. At a 2-minute cadence against a 60-second mandate cooldown the
+keeper compounded roughly 120 times an hour across two mandates and spent 0.09 ETH
+overnight (246 executions). Both wallets hit their floors and stopped — correctly, and
+without wasting gas on sends that could not pay.
+
+Default is now **30 minutes** (~0.014 ETH/day across two mandates). For recording,
+speed it up for that session only:
+
+```bash
+pm2 delete envoyage-swap-loop
+SWAP_CADENCE_MS=60000 pm2 start ecosystem.config.cjs --only envoyage-swap-loop
+```
+
+Mandate cooldowns cannot be edited after grant — that is by design. To change one,
+revoke and re-grant.
