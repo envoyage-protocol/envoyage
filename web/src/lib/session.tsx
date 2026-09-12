@@ -1,6 +1,6 @@
 import {createContext, useContext, useEffect, useState, type ReactNode} from "react";
 import type {Address, WalletClient} from "viem";
-import {connect as walletConnect, hasWallet, onAccountChange} from "./wallet";
+import {connect as walletConnect, hasWallet, onAccountChange, restore} from "./wallet";
 import {CHAIN} from "./config";
 
 type Session = {
@@ -54,6 +54,32 @@ export function SessionProvider({children}: {children: ReactNode}) {
     const h = (...a: unknown[]) => setChainId(parseInt(String(a[0]), 16));
     eth.on("chainChanged", h);
     return () => eth.removeListener?.("chainChanged", h);
+  }, []);
+
+  // Pick an already-authorised wallet back up on load. Without this, a reload —
+  // including the presenter refreshing mid-recording — drops the session and
+  // shows the connect gate while the wallet is still connected to this origin,
+  // which also undercuts the hire flow's promise that reloading resumes from the
+  // first incomplete step.
+  //
+  // The guards matter: `stale` drops a late answer after unmount, and the
+  // functional setState means a restore that resolves AFTER the user has already
+  // pressed connect cannot overwrite the account they just chose.
+  useEffect(() => {
+    let stale = false;
+    restore()
+      .then((r) => {
+        if (stale || !r) return;
+        setAccount((cur) => cur ?? r.account);
+        setClient((cur) => cur ?? r.client);
+        readChain();
+      })
+      .catch(() => {
+        /* no wallet, locked, or the request was refused: the gate stays up */
+      });
+    return () => {
+      stale = true;
+    };
   }, []);
 
   async function connect() {

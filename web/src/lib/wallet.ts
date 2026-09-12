@@ -19,6 +19,28 @@ export function hasWallet(): boolean {
   return typeof window !== "undefined" && !!window.ethereum;
 }
 
+/// Silently restore a connection this origin was already granted.
+///
+/// `eth_accounts` is the non-prompting twin of `eth_requestAccounts`: it returns
+/// the accounts the user has already approved for this site and opens nothing.
+/// An empty array means never connected, or the wallet is locked — both of which
+/// correctly leave the connect gate up.
+///
+/// It deliberately does NOT do connect()'s chain switch. connect() runs because
+/// someone pressed a button, so a switch prompt there is expected; running the
+/// same thing on page load would pop a wallet dialog nobody asked for. A restored
+/// session sitting on the wrong chain is exactly what NetworkBanner is for.
+///
+/// New function, additive: connect() is untouched.
+export async function restore(): Promise<{client: WalletClient; account: Address} | null> {
+  if (!window.ethereum) return null;
+  const accounts = (await window.ethereum.request({method: "eth_accounts"})) as Address[] | undefined;
+  const account = accounts?.[0];
+  if (!account) return null;
+  const client = createWalletClient({account, chain: CHAIN, transport: custom(window.ethereum)});
+  return {client, account};
+}
+
 export async function connect(): Promise<{client: WalletClient; account: Address}> {
   if (!window.ethereum) throw new Error("No wallet found. Install MetaMask or Rabby.");
 
