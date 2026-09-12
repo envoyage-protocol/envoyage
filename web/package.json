@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "e2e": "node tests/e2e/flow.mjs",
+    "e2e:hire": "node tests/e2e/hire.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -21,6 +23,7 @@
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",
     "jsdom": "^25.0.1",
+    "playwright": "^1.63.0",
     "typescript": "^5.6.3",
     "vite": "^5.4.10",
     "vitest": "^2.1.9"
