@@ -1,6 +1,5 @@
-import {useEffect, useRef, type ReactNode} from "react";
-import {useRoute, useSession} from "../lib/session";
-import {fetchMandatesByGrantor} from "../lib/graph";
+import {type ReactNode} from "react";
+import {useRoute} from "../lib/session";
 import {ENVOYAGE, EXPLORER} from "../lib/config";
 import {WalletBar} from "./WalletBar";
 import {NetworkBanner} from "./NetworkBanner";
@@ -32,35 +31,19 @@ function Nav({route, go}: {route: string; go: (r: string) => void}) {
   );
 }
 
-/// Letterhead, nav, wallet, network banner — and the landing rule: a wallet that
-/// already holds mandates lands on My mandates, once per account, only from Home.
+/// Letterhead, nav, wallet, network banner.
+///
+/// The landing rule is gone, deliberately. It took a wallet that already held
+/// mandates and sent it to My mandates on arrival, which made sense when "" was
+/// Home. Proof-first retired it: "" must not be hijacked, since it is the demo's
+/// opening screen, and the only other candidate — "how" — is a destination
+/// somebody CLICKS in the nav. Pointed there, the rule made "How it works"
+/// unreachable for exactly the people who have mandates. A returning owner now
+/// lands on Proof and presses My mandates themselves, which costs one click and
+/// never takes a screen away from them.
 export function Shell({render}: {render: (route: string, go: (r: string) => void) => ReactNode}) {
   const [route, go] = useRoute();
-  const {account} = useSession();
-  const redirected = useRef<string | null>(null);
 
-  useEffect(() => {
-    if (!account || redirected.current === account) return;
-    // Only from Home. This used to fire from the landing route, which is now
-    // Proof — so connecting a wallet during the demo would have bounced the
-    // presenter off the opening screen mid-sentence.
-    //
-    // The route check comes BEFORE the one-shot ref is consumed, and `route` is
-    // in the deps. With the ref set first, connecting on Proof (which is now
-    // where people connect) burned the one shot and the rule could never fire
-    // again for that account — inert, and wallet-gated, so nothing would have
-    // caught it.
-    if (route !== "how") return;
-    redirected.current = account;
-    fetchMandatesByGrantor(account)
-      .then((d) => {
-        if (d.mandates.length > 0 && window.location.hash.replace(/^#\/?/, "") === "how") go("mandates");
-      })
-      .catch(() => {
-        /* the subgraph being down must not block landing */
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [account, route]);
 
   return (
     <div className="page">
