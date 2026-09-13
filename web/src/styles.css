@@ -2252,15 +2252,13 @@ input[type="radio"]:focus-visible {
 .wallet-pick img {
   border-radius: 3px;
 }
-.wallet-swap {
-  margin-left: 6px;
-  padding: 0;
-  background: none;
-  border: 0;
-  cursor: pointer;
-  font: inherit;
-  font-size: 11px;
-  color: var(--amber);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+.wallet-pick button > span {
+  flex: 1;
+}
+/* The mark for "this is the one you are on". A dot, matching the chip's own. */
+.pick-on {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--amber-mark);
 }

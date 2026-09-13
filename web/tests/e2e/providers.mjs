@@ -79,6 +79,7 @@ async function run() {
     await p.goto(`${BASE}/?p=${Date.now()}#/`, {waitUntil: "networkidle"});
     await p.waitForTimeout(2500);
     ck((await chip(p).innerText()).includes("choose a wallet"), "the chip asks for a choice", await chip(p).innerText());
+    ck((await p.locator(".wallet-swap").count()) === 0, "no second control in the masthead");
     await chip(p).click();
     await p.waitForTimeout(400);
     const names = await p.locator(".wallet-pick button").allInnerTexts();
@@ -88,6 +89,14 @@ async function run() {
     const t = await chip(p).innerText();
     ck(/0xbBbB|0xbbbb/i.test(t), "connected as the wallet that was PICKED, not the legacy slot", t);
     ck(!/0xCcCC|0xcccc/i.test(t), "the window.ethereum wallet was not used");
+
+    // and the switch is reachable from the chip itself, mid-session
+    await chip(p).click();
+    await p.waitForTimeout(400);
+    ck((await p.locator(".wallet-pick button").count()) === 2, "the chip reopens the list while connected");
+    await p.locator(".wallet-pick button", {hasText: "Wallet Alpha"}).click();
+    await p.waitForTimeout(2500);
+    ck(/0xAAAa|0xaaaa/i.test(await chip(p).innerText()), "switched to the other wallet from the chip", await chip(p).innerText());
     await p.context().close();
   }
 
@@ -100,6 +109,7 @@ async function run() {
     await chip(p).click();
     await p.waitForTimeout(2500);
     ck(/0xAAAa|0xaaaa/i.test(await chip(p).innerText()), "connected to the only wallet");
+    ck((await p.locator(".wallet .chip").evaluate((e) => e.tagName)) === "SPAN", "a single wallet leaves a label, not a control");
     await p.context().close();
   }
 
