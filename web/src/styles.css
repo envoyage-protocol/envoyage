@@ -2207,3 +2207,60 @@ input[type="radio"]:focus-visible {
     transition: none;
   }
 }
+
+/* ── the wallet picker ──────────────────────────────────────────────────────
+   Only rendered when more than one wallet announced itself. It hangs off the
+   chip rather than taking a modal, because choosing a wallet is a correction,
+   not a step — the common case is one wallet and no list at all. */
+.wallet {
+  position: relative;
+}
+.wallet-pick {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  min-width: 190px;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  box-shadow: 0 6px 22px rgb(0 0 0 / 0.14);
+}
+.wallet-pick li + li {
+  border-top: 1px solid var(--rule);
+}
+.wallet-pick button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  text-align: left;
+}
+.wallet-pick button:hover,
+.wallet-pick button:focus-visible {
+  background: var(--wash);
+}
+.wallet-pick img {
+  border-radius: 3px;
+}
+.wallet-swap {
+  margin-left: 6px;
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  color: var(--amber);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

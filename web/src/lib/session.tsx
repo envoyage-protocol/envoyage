@@ -1,6 +1,7 @@
 import {createContext, useContext, useEffect, useState, type ReactNode} from "react";
 import type {Address, WalletClient} from "viem";
-import {connect as walletConnect, hasWallet, onAccountChange, restore} from "./wallet";
+import {connect as walletConnect, eth, hasWallet, onAccountChange, restore} from "./wallet";
+import {listProviders, rediscover, selectProvider, subscribeProviders, chosenRdns, type ProviderInfo} from "./providers";
 import {CHAIN} from "./config";
 
 type Session = {
@@ -15,6 +16,12 @@ type Session = {
   /// True when there is no account yet (nothing to gate) or the wallet is on Sepolia.
   onSepolia: boolean;
   switchToSepolia(): Promise<void>;
+  /// The wallets that announced themselves (EIP-6963). Empty when only the legacy
+  /// `window.ethereum` slot exists, which is the single-wallet case.
+  providers: ProviderInfo[];
+  /// Which one the user picked, by rdns; null means "whatever is in the slot".
+  provider: string | null;
+  chooseProvider(rdns: string | null): void;
 };
 
 const Ctx = createContext<Session | null>(null);
@@ -25,10 +32,29 @@ export function SessionProvider({children}: {children: ReactNode}) {
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [chainId, setChainId] = useState<number | null>(null);
+  const [providers, setProviders] = useState<ProviderInfo[]>(() => listProviders().map((d) => d.info));
+  const [provider, setProvider] = useState<string | null>(chosenRdns);
+
+  // Extensions that load after first paint miss the initial request, so ask again
+  // and keep listening. Without the re-ask a wallet can be installed and present
+  // yet invisible to the picker.
+  useEffect(() => {
+    const sync = () => setProviders(listProviders().map((d) => d.info));
+    const un = subscribeProviders(sync);
+    rediscover();
+    const t = setTimeout(() => {
+      rediscover();
+      sync();
+    }, 800);
+    return () => {
+      un();
+      clearTimeout(t);
+    };
+  }, []);
 
   async function readChain() {
     try {
-      const hex = (await window.ethereum?.request({method: "eth_chainId"})) as string | undefined;
+      const hex = (await eth()?.request({method: "eth_chainId"})) as string | undefined;
       if (hex) setChainId(parseInt(hex, 16));
     } catch {
       /* no wallet, or it refused: stays unknown */
@@ -37,7 +63,7 @@ export function SessionProvider({children}: {children: ReactNode}) {
 
   async function switchToSepolia() {
     try {
-      await window.ethereum?.request({
+      await eth()?.request({
         method: "wallet_switchEthereumChain",
         params: [{chainId: `0x${CHAIN.id.toString(16)}`}]
       });
@@ -49,12 +75,14 @@ export function SessionProvider({children}: {children: ReactNode}) {
 
   useEffect(() => {
     readChain();
-    const eth = window.ethereum;
-    if (!eth?.on) return;
+    const p = eth();
+    if (!p?.on) return;
     const h = (...a: unknown[]) => setChainId(parseInt(String(a[0]), 16));
-    eth.on("chainChanged", h);
-    return () => eth.removeListener?.("chainChanged", h);
-  }, []);
+    p.on("chainChanged", h);
+    return () => p.removeListener?.("chainChanged", h);
+    // Re-bound when the chosen wallet changes: the old provider's events are not
+    // the new one's.
+  }, [provider]);
 
   // Pick an already-authorised wallet back up on load. Without this, a reload —
   // including the presenter refreshing mid-recording — drops the session and
@@ -80,7 +108,7 @@ export function SessionProvider({children}: {children: ReactNode}) {
     return () => {
       stale = true;
     };
-  }, []);
+  }, [provider]);
 
   async function connect() {
     setConnecting(true);
@@ -106,7 +134,9 @@ export function SessionProvider({children}: {children: ReactNode}) {
         if (a) walletConnect().then((r) => setClient(r.client)).catch(() => setClient(null));
         else setClient(null);
       }),
-    []
+    // The listener belongs to one provider object; pick a different wallet and it
+    // has to be re-bound or account switches stop arriving mid-demo.
+    [provider]
   );
 
   return (
@@ -120,7 +150,16 @@ export function SessionProvider({children}: {children: ReactNode}) {
         connect,
         chainId,
         onSepolia: !account || chainId === null || chainId === CHAIN.id,
-        switchToSepolia
+        switchToSepolia,
+        providers,
+        provider,
+        chooseProvider: (rdns) => {
+          selectProvider(rdns);
+          setProvider(rdns);
+          setAccount(null);
+          setClient(null);
+          setError(null);
+        }
       }}
     >
       {children}

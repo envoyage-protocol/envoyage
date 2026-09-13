@@ -1,9 +1,10 @@
 import {createWalletClient, custom, type Address, type WalletClient, type Hex} from "viem";
 import {CHAIN} from "./config";
+import {activeProvider, anyProvider} from "./providers";
 
 /// The injected provider (MetaMask, Rabby, …). viem talks to it directly, so the app
 /// carries no wallet SDK — one less thing that can break on demo day.
-type Eip1193 = {
+export type Eip1193 = {
   request(args: {method: string; params?: unknown[]}): Promise<unknown>;
   on?(event: string, cb: (...a: unknown[]) => void): void;
   removeListener?(event: string, cb: (...a: unknown[]) => void): void;
@@ -15,8 +16,15 @@ declare global {
   }
 }
 
+/// The provider the app talks to. `activeProvider()` is the EIP-6963 choice when
+/// there is one and `window.ethereum` otherwise, so with a single wallet installed
+/// this is the same object the app has always used.
+export function eth(): Eip1193 | undefined {
+  return activeProvider();
+}
+
 export function hasWallet(): boolean {
-  return typeof window !== "undefined" && !!window.ethereum;
+  return typeof window !== "undefined" && anyProvider();
 }
 
 /// Silently restore a connection this origin was already granted.
@@ -33,32 +41,34 @@ export function hasWallet(): boolean {
 ///
 /// New function, additive: connect() is untouched.
 export async function restore(): Promise<{client: WalletClient; account: Address} | null> {
-  if (!window.ethereum) return null;
-  const accounts = (await window.ethereum.request({method: "eth_accounts"})) as Address[] | undefined;
+  const p = eth();
+  if (!p) return null;
+  const accounts = (await p.request({method: "eth_accounts"})) as Address[] | undefined;
   const account = accounts?.[0];
   if (!account) return null;
-  const client = createWalletClient({account, chain: CHAIN, transport: custom(window.ethereum)});
+  const client = createWalletClient({account, chain: CHAIN, transport: custom(p)});
   return {client, account};
 }
 
 export async function connect(): Promise<{client: WalletClient; account: Address}> {
-  if (!window.ethereum) throw new Error("No wallet found. Install MetaMask or Rabby.");
+  const p = eth();
+  if (!p) throw new Error("No wallet found. Install MetaMask or Rabby.");
 
-  const accounts = (await window.ethereum.request({method: "eth_requestAccounts"})) as Address[];
+  const accounts = (await p.request({method: "eth_requestAccounts"})) as Address[];
   const account = accounts[0];
   if (!account) throw new Error("Wallet returned no account.");
 
   // Sepolia only. Switch rather than fail, and add the chain if the wallet has never
   // seen it — that is the state a judge's wallet is most likely in.
   const chainIdHex = `0x${CHAIN.id.toString(16)}` as Hex;
-  const current = (await window.ethereum.request({method: "eth_chainId"})) as string;
+  const current = (await p.request({method: "eth_chainId"})) as string;
   if (current.toLowerCase() !== chainIdHex) {
     try {
-      await window.ethereum.request({method: "wallet_switchEthereumChain", params: [{chainId: chainIdHex}]});
+      await p.request({method: "wallet_switchEthereumChain", params: [{chainId: chainIdHex}]});
     } catch (e) {
       const code = (e as {code?: number}).code;
       if (code !== 4902) throw e;
-      await window.ethereum.request({
+      await p.request({
         method: "wallet_addEthereumChain",
         params: [
           {
@@ -73,18 +83,19 @@ export async function connect(): Promise<{client: WalletClient; account: Address
     }
   }
 
-  const client = createWalletClient({account, chain: CHAIN, transport: custom(window.ethereum)});
+  const client = createWalletClient({account, chain: CHAIN, transport: custom(p)});
   return {client, account};
 }
 
 /// Fires when the user switches account in the wallet. The demo switches between the
 /// owner key and the keeper key mid-flow, so this has to be live.
 export function onAccountChange(cb: (account: Address | null) => void): () => void {
-  if (!window.ethereum?.on) return () => {};
+  const p = eth();
+  if (!p?.on) return () => {};
   const handler = (...a: unknown[]) => {
     const accs = a[0] as Address[];
     cb(accs[0] ?? null);
   };
-  window.ethereum.on("accountsChanged", handler);
-  return () => window.ethereum?.removeListener?.("accountsChanged", handler);
+  p.on("accountsChanged", handler);
+  return () => p.removeListener?.("accountsChanged", handler);
 }
