@@ -1676,9 +1676,13 @@ p.pending {
   margin-top: 8px;
   color: var(--ink-muted);
 }
+/* 15px to sit with the .tag line the other panel uses at 14px. The two panels
+   are peers read side by side, and only the right one has this paragraph — at
+   16px its whole body read a size larger than its twin. */
 .duel-sub {
   margin: 14px 0 20px;
-  font-size: 16px;
+  font-size: 15px;
+  line-height: 1.55;
   color: var(--ink-muted);
 }
 .duel-actions {
@@ -1754,15 +1758,20 @@ p.pending {
 .keeper-status .value {
   font-family: var(--display);
   display: block;
-  font-size: clamp(22px, 2.6vw, 30px);
-  line-height: 1.15;
+  /* 24, not 30. These two sit under a 14px label as a matched pair, and at 30
+     the jump was 2.1x — the number shouted over the status beside it, which is
+     the half that actually says whether the bot may act. */
+  font-size: clamp(20px, 2vw, 24px);
+  line-height: 1.2;
   margin-top: 4px;
   overflow-wrap: anywhere;
 }
 .keeper-status .value small {
   display: block;
   font-family: var(--serif);
-  font-size: 15px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  margin-top: 3px;
   color: var(--ink-muted);
 }
 .keeper-status .seal {

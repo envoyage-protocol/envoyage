@@ -28,6 +28,7 @@ export function useTheft() {
   const [naiveState, setNaive] = useState<TxState>({phase: "idle"});
   const [envState, setEnv] = useState<TxState>({phase: "idle"});
   const [preview, setPreview] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
   const [victimOwner, setVictimOwner] = useState<Address | null>(null);
   // The bot in this story is the demo mandate's keeper. Both theft presses are
   // gated on that wallet, so "the same bot" is literally the same address.
@@ -99,17 +100,33 @@ export function useTheft() {
     }
   }
 
+  /// A real probe, not a canned sentence: it builds the same action array the
+  /// theft uses, reads the ABI for the selector, and eth_calls it. The message is
+  /// derived from what came back — including an "Unexpected" branch, because a
+  /// check that can only ever print one answer is decoration.
+  ///
+  /// It carries a visible lifecycle because without one a second press changed
+  /// nothing on screen and read as a dead button.
   async function runPreview() {
     if (!thief) return;
-    const {currency0, currency1} = await currencies();
-    const actions = buildTheftActions(NAIVE_VICTIM_TOKEN_ID, currency0, currency1, thief, STEAL);
-    const r = await previewTheftAgainstEnvoyage(NAIVE_VICTIM_TOKEN_ID, actions, thief);
-    setPreview(
-      r.existsOnAbi
-        ? `Envoyage exposes execute(uint256,bytes) — selector ${r.selector}. Unexpected.`
-        : `Envoyage has no function with selector ${r.selector}. The call ${r.reverted ? "reverts before any code runs" : "did not revert (unexpected)"}.`
-    );
+    setChecking(true);
+    setPreview(null);
+    try {
+      const {currency0, currency1} = await currencies();
+      const actions = buildTheftActions(NAIVE_VICTIM_TOKEN_ID, currency0, currency1, thief, STEAL);
+      const r = await previewTheftAgainstEnvoyage(NAIVE_VICTIM_TOKEN_ID, actions, thief);
+      setPreview(
+        r.existsOnAbi
+          ? `Envoyage exposes execute(uint256,bytes) — selector ${r.selector}. Unexpected.`
+          : `Envoyage has no function with selector ${r.selector}. The call ${r.reverted ? "reverts before any code runs" : "did not revert (unexpected)"}.`
+      );
+    } catch (e) {
+      setPreview(`Could not read the ABI: ${explainRevert(e)}`);
+    } finally {
+      setChecking(false);
+    }
   }
+
 
   async function runEnvoyage() {
     if (!client || !thief) return;
@@ -166,7 +183,7 @@ export function useTheft() {
   // compound reverts NotKeeper for anyone else, revoke is the grantor's alone.
   // Those refusals are the product working, so they stay.
   const ready = !!client && !!thief;
-  return {thief, ready, keeper, isKeeper, victimOwner, honestState, naiveState, envState, preview, runNaiveHonest, runNaive, runPreview, runEnvoyage};
+  return {thief, ready, keeper, isKeeper, victimOwner, honestState, naiveState, envState, preview, checking, runNaiveHonest, runNaive, runPreview, runEnvoyage};
 }
 
 export type TheftFlow = ReturnType<typeof useTheft>;
@@ -265,8 +282,8 @@ export function MandateTheft({t}: {t: TheftFlow}) {
       </p>
       <p className="port absent">execute(uint256 tokenId, bytes actions) — absent</p>
       <div className="duel-actions">
-        <button className="act act-ghost" onClick={t.runPreview} disabled={!t.thief}>
-          Check the ABI first
+        <button className="act act-ghost" onClick={t.runPreview} disabled={!t.thief || t.checking} aria-busy={t.checking}>
+          {t.checking ? "Reading the ABI…" : t.preview ? "Check the ABI again" : "Check the ABI first"}
         </button>
         <ActionButton label="Bot: send the same theft to Envoyage" tone="hostile" state={t.envState} onClick={t.runEnvoyage} disabled={!t.ready} />
       </div>

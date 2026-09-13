@@ -342,7 +342,13 @@ export function KeeperActs({mandateId = DEMO_MANDATE_ID, theftSide}: {mandateId?
           <div className="keeper-status">
             <div>
               <span className="label">Position liquidity</span>
-              <span className="value num">{liq === null ? "…" : formatUnits(liq, 18)}</span>
+              {/* Four decimals on screen, the exact value in the title. Eighteen decimals
+                  of wei precision set at display size is not a fact anyone reads — it
+                  is a wall of digits that swamps the status beside it. Nothing is
+                  hidden: hover, or read it from the contract. */}
+              <span className="value num" title={liq === null ? undefined : formatUnits(liq, 18)}>
+                {liq === null ? "…" : Number(formatUnits(liq, 18)).toFixed(4)}
+              </span>
             </div>
             <div>
               <span className="label">Mandate status</span>
