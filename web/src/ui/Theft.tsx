@@ -150,10 +150,23 @@ export function useTheft() {
           : {phase: "failed", note: <>The call unexpectedly succeeded. <Tx hash={hash}>inspect</Tx></>}
       );
     } catch (e) {
-      // The wallet refused to send a tx it predicts will fail. Fall back to naming it.
+      // This catch fires for ANY failure, and they do not mean the same thing. It
+      // used to say "your wallet refused a transaction it predicts will fail —
+      // which is itself the point" for all of them, so pressing Reject in MetaMask
+      // produced a claim that Envoyage had refused the call. It had not: nothing
+      // was sent and nothing was observed. Presenting someone's own cancellation
+      // as evidence for the security claim is precisely what this page exists to
+      // let people check rather than take on trust.
+      const msg = e instanceof Error ? e.message : String(e);
+      const declined = /user rejected|user denied|denied transaction|rejected the request/i.test(msg);
       setEnv({
         phase: "failed",
-        note: (
+        note: declined ? (
+          <>
+            You declined it in your wallet, so nothing was sent and nothing is proven yet. Press it again and
+            confirm — the transaction is <em>meant</em> to fail, and the failed transaction is the evidence.
+          </>
+        ) : (
           <>
             Your wallet refused to submit a transaction it predicts will fail — which is itself the
             point: there is nothing here to call. {explainRevert(e)}
