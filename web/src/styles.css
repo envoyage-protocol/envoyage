@@ -76,8 +76,13 @@
   --measure: 62ch;
   --sheet-pad: clamp(20px, 4vw, 48px);
 }
+/* Dark comes from the system by default. An explicit choice on <html> wins over
+   it in BOTH directions, which is why the media query excludes data-theme=light
+   and why the dark tokens appear twice. The duplication is deliberate and the two
+   lists must stay identical — there is no way in CSS to apply one declaration
+   block to a media query and an attribute selector at once. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     color-scheme: dark;
     --desk: #000000;
     --paper: #000000;
@@ -102,6 +107,31 @@
     --graph: #9b85ff;
     --ens: #6fb0f7;
   }
+}
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --desk: #000000;
+    --paper: #000000;
+    --well: #111110;
+    --ink: #ededea;
+    --ink-muted: #a3a39e;
+    --rule: #33332f;
+    --rule-soft: #1f1f1d;
+
+    --amber: #ffc061;
+    --amber-fill: #ffa02e;
+    --amber-fill-ink: #000000;
+    /* In dark the fill clears 3:1 on its own (10.32:1), so mark == fill. */
+    --amber-mark: #ffa02e;
+    --amber-tint: #241708;
+
+    --ok: #4fd684;
+    --warn: #f2b04f;
+    --bad: #ff7a70;
+
+    --uni: #ff6fa8;
+    --graph: #9b85ff;
+    --ens: #6fb0f7;
 }
 
 *,
@@ -233,9 +263,12 @@ b {
 /* Placed AFTER the rule it overrides on purpose: same specificity, so source
    order decides, and higher up in the file it silently lost. */
 @media (prefers-color-scheme: dark) {
-  .brand .plate img {
+  :root:not([data-theme="light"]) .brand .plate img {
     filter: none;
   }
+}
+:root[data-theme="dark"] .brand .plate img {
+  filter: none;
 }
 .brand .word {
   font-family: var(--display);
@@ -353,6 +386,19 @@ a.chip:hover {
 }
 .dot-bad {
   background: var(--bad);
+}
+.dot-theme {
+  background: var(--ink-muted);
+}
+/* The word that says which address this is. Quiet enough not to compete with the
+   address itself, loud enough that the two chips can never be mistaken. */
+.chip-key {
+  color: var(--ink-muted);
+  opacity: 0.85;
+}
+.theme-toggle {
+  min-width: 66px;
+  justify-content: center;
 }
 
 .chain {

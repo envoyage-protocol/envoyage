@@ -13,6 +13,7 @@ export function WalletBar() {
       {account ? (
         <span className="chip" title={account}>
           <i className="dot dot-amber" aria-hidden="true" />
+          <span className="chip-key">wallet</span>
           {short(account)}
         </span>
       ) : available ? (

@@ -2,6 +2,7 @@ import {type ReactNode} from "react";
 import {useRoute} from "../lib/session";
 import {ENVOYAGE, EXPLORER} from "../lib/config";
 import {WalletBar} from "./WalletBar";
+import {ThemeToggle} from "./ThemeToggle";
 import {NetworkBanner} from "./NetworkBanner";
 import {short} from "./kit";
 
@@ -69,14 +70,20 @@ export function Shell({render}: {render: (route: string, go: (r: string) => void
         </button>
         <div className="masthead-right">
           <Nav route={route} go={go} />
+          {/* Two addresses sit side by side here and they are different things:
+              the contract you are talking to, and the account you are talking as.
+              Making them one shape fixed the alignment but made them easy to
+              confuse, so each now says which it is. */}
           <p className="chip chain">
             <i className="dot" aria-hidden="true" />
             Sepolia
+            <span className="chip-key">contract</span>
             <a href={`${EXPLORER}/address/${ENVOYAGE}#code`} target="_blank" rel="noreferrer">
               {short(ENVOYAGE)}
             </a>
           </p>
           <WalletBar />
+          <ThemeToggle />
         </div>
       </header>
       <NetworkBanner />
