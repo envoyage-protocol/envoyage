@@ -31,3 +31,8 @@ web/node_modules/
 web/dist/
 keeper/node_modules/
 web/.env.local
+
+# Backstage: process logs, form drafts, handoff prompts and debug captures.
+# Kept on disk, deliberately not published — a judge reading prize-form strategy
+# or 75 debugging screenshots learns nothing about the product.
+docs/_local/

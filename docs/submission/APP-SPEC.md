@@ -6,10 +6,10 @@ integrations fit. Self-contained: you do not need the repo to read it.
 Written 11 Sep 2026. Live figures in this document were read from the chain and the
 subgraphs at the time of writing and keep moving — the bot is running.
 
-> **What this supersedes.** `HOW-IT-FITS.md` (the diagram) and `INTEGRATIONS.md`
-> (sponsor verification commands) are both folded into this file. `UI-REVIEW.md` is
-> the design critique and stays separate. `ARCHITECTURE.md` is the contract-level
-> design and stays separate.
+> **What this supersedes.** The earlier `HOW-IT-FITS.md` (the diagram) and
+> `INTEGRATIONS.md` (sponsor verification commands) are folded into this file and no
+> longer kept separately. `UI-REVIEW.md` is the design critique and stays separate.
+> `ARCHITECTURE.md` is the contract-level design and stays separate.
 
 ---
 
@@ -324,13 +324,24 @@ contrast measured, not assumed.
 
 ---
 
-## 7. Known-wrong, as of writing
+## 7. The interface, before and after
 
-See `UI-REVIEW.md` for the full critique. In short: the visual direction ("a paper
-legal instrument") was chosen when this was a document to read and now fights an app
-you operate; the typeface is a hand-drawn serif on a product that sells precision; the
-diagram's labels collide because they are hand-placed at absolute coordinates; the two
-header chips are built as different components so they will never align; and the
-three integrations still read as badges rather than as the system §2 describes.
+Written 11 Sep, this section listed what was wrong with the interface: the visual
+direction ("a paper legal instrument") was chosen when this was a document to read
+and fought an app you operate; the typeface was a hand-drawn serif on a product
+that sells precision; the diagram's labels collided because they were hand-placed
+at absolute coordinates; the two header chips were built as different components
+so they could never align; and the three integrations read as badges rather than
+as the system §2 describes.
 
-The app *works*. The interface has not caught up with it.
+**All of that has since been addressed** — see `UI-REVIEW.md` for the critique
+those changes answer, and the `redesign:` commits for what each one did. The type
+is now IBM Plex Sans and Mono with tabular figures, the diagram was rebuilt so no
+two edges cross and every label sits on a straight run of its own edge, the chips
+are one component, and the three registries are a section of their own, colour-
+keyed to the diagram's edges.
+
+Two behaviours found later and also fixed, both by driving the live app rather
+than by reading the diff: declining the network switch left a user with no account
+and no instruction, and the Proof tab's theft was gated on the keeper's key, so
+nobody but us could run the demonstration the whole project rests on.
