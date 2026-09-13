@@ -142,6 +142,40 @@ export function PositionPicker({
           </tbody>
         </table>
       )}
+
+      {/* Why nothing can be picked, said where the disabled control is rather than
+          400px below it. A row carries its reason in the Status column, but a
+          disabled radio beside a status badge is not an instruction: the first
+          person to hit this read the sign gate's "choose a position first" and
+          concluded the page was broken, because they HAD chosen — they simply
+          were not allowed to, and nothing told them what to do about it. */}
+      {rows.length > 0 && !rows.some((r) => r.state === "ok") && !rows.some((r) => r.state === "checking") && (
+        <p className="gate" style={{marginTop: 12}}>
+          {rows.some((r) => r.state === "mandated") ? (
+            <>
+              <b>Nothing to sign here yet.</b> Position #{rows.find((r) => r.state === "mandated")!.tokenId.toString()} already
+              carries mandate No. {rows.find((r) => r.state === "mandated")!.mandateId?.toString()}. A position holds one mandate
+              at a time — revoke it from <b>My mandates</b> first, or pick a different position.
+            </>
+          ) : rows.some((r) => r.state === "not-yours") ? (
+            <>
+              <b>Nothing to sign here yet.</b> That position belongs to another wallet, and only its owner can grant a mandate
+              over it. Switch to the wallet that owns it, or press <b>Get a demo position</b> above to mint one of your own.
+            </>
+          ) : rows.some((r) => r.state === "wrong-pool") ? (
+            <>
+              <b>Nothing to sign here yet.</b> That position is not in the demo pool, which is the only pool this reference
+              keeper is wired to. Press <b>Get a demo position</b> above to mint one it can work on.
+            </>
+          ) : (
+            <>
+              <b>Nothing to sign here yet.</b> None of these positions can take a mandate right now — the Status column says why
+              for each.
+            </>
+          )}
+        </p>
+      )}
+
       <div className="paste" style={{marginTop: 14}}>
         <label htmlFor="paste-id" className="label" style={{display: "block", fontSize: 14, color: "var(--ink-muted)"}}>
           Have a position already? Paste its token id

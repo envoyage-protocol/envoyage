@@ -263,7 +263,7 @@ export function Hire({go}: {go: (r: string) => void}) {
         <article className="sheet" style={{marginTop: 24}}>
           <div className="docket">
             <span className="caps">3 · Sign</span>
-            <span>{selected === null ? "choose a position first" : `position #${selected.toString()}`}</span>
+            <span>{selected === null ? "no position selected — see step 1" : `position #${selected.toString()}`}</span>
           </div>
           {selected !== null && !facts && !factsErr && <p className="pending">Reading the position's approval, mandate and name…</p>}
           {factsErr && (
