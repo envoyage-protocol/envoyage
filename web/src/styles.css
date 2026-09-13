@@ -291,7 +291,7 @@ b {
 .masthead-right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
   min-width: 0;
   max-width: 100%;
@@ -311,7 +311,9 @@ b {
   font: inherit;
   font-size: 14px;
   font-weight: 500;
-  padding: 15px 12px 13px;
+  /* 9px, not 12: the row carries six items plus three chips, and at 12 it
+     overflowed 1156px by ~18 and wrapped to a second line. Measured, not guessed. */
+  padding: 15px 9px 13px;
   border: 0;
   border-bottom: 2px solid transparent;
   background: transparent;
@@ -794,13 +796,25 @@ a.chip:hover {
   align-items: end;
   padding: clamp(32px, 5vw, 56px) 0 clamp(24px, 4vw, 40px);
 }
+/* `.walk .proof-lede`, not `.proof-lede`, and the reason is specificity: this
+   headline is also matched by `.walk .lede h1` (0,2,1) which caps it at 16ch.
+   A `.proof-lede h1` rule is (0,1,1) and loses no matter where it sits in the
+   file — twice I "fixed" this and twice the cap survived, because I checked the
+   rule I had written instead of asking the browser which rules actually matched.
+   text-wrap is set explicitly rather than removed: deleting it let `.lede h1`'s
+   `balance` through, and balance equalises line LENGTHS, which on a sentence this
+   long produced four short lines filling 77% of the column — the text hugged the
+   left and left a hole before the acts panel. */
+.walk .proof-lede h1 {
+  max-width: none;
+  text-wrap: pretty;
+}
 .proof-lede h1 {
   margin: 0 0 14px;
   font-size: clamp(32px, 4.2vw, 52px);
   line-height: 1.04;
   font-weight: 600;
   letter-spacing: -0.022em;
-  text-wrap: balance;
   max-width: none;
 }
 .proof-lede > div > p {
@@ -1537,9 +1551,12 @@ p.pending {
 
 
 /* ── demo route ─────────────────────────────────────────────────────────── */
-.walk .lede h1 {
-  max-width: 16ch;
-}
+/* `.walk .lede h1 { max-width: 16ch }` lived here to narrow the Proof headline
+   when it was the old serif lede. `.walk` wraps only the Proof tab and the one
+   lede inside it is now `.proof-lede`, which sets its own measure — so this rule
+   had become a same-specificity cap sitting later in the file, quietly winning.
+   Removed rather than out-specified: adding weight to beat a dead rule leaves
+   two rules where one will do. */
 .walk .lede .plain {
   margin-top: 18px;
   color: var(--ink-muted);
