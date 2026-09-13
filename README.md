@@ -8,6 +8,21 @@ keeper without handing over `approve` or `setApprovalForAll`.
 > ETHOnline 2026 · Sepolia · net-new (Start Fresh track)
 > Project code began after 4 Sept 2026, 12:00 EDT.
 
+## Try it
+
+**Live app — <https://envoyage-amrrobbs-projects.vercel.app>** (canonical)
+Mirror — <https://envoyage.robbyn.xyz> (same build, served from our own host)
+
+No wallet needed for `#/how` and `#/lookup/1`. With any Sepolia wallet you can run the
+attack yourself on the **Proof** tab: position #39022 is approved to a naive helper
+contract, and `Bot: withdraw everything to itself` drains it **to your own address**.
+Sending the identical bytes to Envoyage mines a failed transaction instead — there is no
+function on Envoyage that accepts an instruction list.
+
+Two buttons are deliberately not yours to press: `compound` reverts `NotKeeper()` for
+anyone but the mandate's keeper, and `revoke` answers only to its grantor. Those
+refusals are the product, not a demo limitation.
+
 ---
 
 ## The problem
